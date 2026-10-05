@@ -18,15 +18,21 @@ struct ZmanEntry: TimelineEntry {
 }
 
 struct ZmanWidgetView: View {
-    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetFamily) private var envFamily
     let entry: ZmanEntry
+    var explicitFamily: WidgetFamily? = nil
 
-    init(entry: ZmanEntry) {
+    init(entry: ZmanEntry, explicitFamily: WidgetFamily? = nil) {
         self.entry = entry
+        self.explicitFamily = explicitFamily
+    }
+
+    private var activeFamily: WidgetFamily {
+        explicitFamily ?? envFamily
     }
 
     var body: some View {
-        switch family {
+        switch activeFamily {
         case .accessoryInline:
             Text(inlineText)
         case .accessoryCircular:

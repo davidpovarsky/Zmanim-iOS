@@ -75,32 +75,28 @@ struct WidgetHarnessView: View {
 
         switch family.lowercased() {
         case "small":
-            ZmanWidgetView(entry: entry)
-                .environment(\.widgetFamily, .systemSmall)
+            ZmanWidgetView(entry: entry, explicitFamily: .systemSmall)
                 .padding()
                 .frame(width: 170, height: 170)
                 .background(Color(red: 0.972, green: 0.966, blue: 0.936))
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .shadow(radius: 8)
         case "large":
-            ZmanWidgetView(entry: entry)
-                .environment(\.widgetFamily, .systemLarge)
+            ZmanWidgetView(entry: entry, explicitFamily: .systemLarge)
                 .padding()
                 .frame(width: 364, height: 382)
                 .background(Color(red: 0.972, green: 0.966, blue: 0.936))
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .shadow(radius: 8)
         case "extralarge":
-            ZmanWidgetView(entry: entry)
-                .environment(\.widgetFamily, .systemExtraLarge)
+            ZmanWidgetView(entry: entry, explicitFamily: .systemExtraLarge)
                 .padding()
                 .frame(width: 380, height: 382)
                 .background(Color(red: 0.972, green: 0.966, blue: 0.936))
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .shadow(radius: 8)
         default: // medium
-            ZmanWidgetView(entry: entry)
-                .environment(\.widgetFamily, .systemMedium)
+            ZmanWidgetView(entry: entry, explicitFamily: .systemMedium)
                 .padding()
                 .frame(width: 364, height: 170)
                 .background(Color(red: 0.972, green: 0.966, blue: 0.936))
