@@ -1,31 +1,31 @@
 import SwiftUI
 import WidgetKit
 
-public struct ZmanEntry: TimelineEntry {
-    public let date: Date
-    public let snapshot: ZmanSnapshot?
-    public let state: String?
+struct ZmanEntry: TimelineEntry {
+    let date: Date
+    let snapshot: ZmanSnapshot?
+    let state: String?
 
-    public init(date: Date, snapshot: ZmanSnapshot?, state: String?) {
+    init(date: Date, snapshot: ZmanSnapshot?, state: String?) {
         self.date = date
         self.snapshot = snapshot
         self.state = state
     }
 
-    public var next: ZmanItem? {
+    var next: ZmanItem? {
         snapshot?.items.first(where: { $0.date > date })
     }
 }
 
-public struct ZmanWidgetView: View {
+struct ZmanWidgetView: View {
     @Environment(\.widgetFamily) private var family
-    public let entry: ZmanEntry
+    let entry: ZmanEntry
 
-    public init(entry: ZmanEntry) {
+    init(entry: ZmanEntry) {
         self.entry = entry
     }
 
-    public var body: some View {
+    var body: some View {
         switch family {
         case .accessoryInline:
             Text(inlineText)
@@ -47,7 +47,7 @@ public struct ZmanWidgetView: View {
         }
     }
 
-    public var small: some View {
+    var small: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("זמני היום").font(.headline)
@@ -79,7 +79,7 @@ public struct ZmanWidgetView: View {
         }
     }
 
-    public var medium: some View {
+    var medium: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.snapshot?.cityName ?? "זמני היום").font(.caption).foregroundStyle(.secondary)
@@ -102,7 +102,7 @@ public struct ZmanWidgetView: View {
         }
     }
 
-    public var large: some View {
+    var large: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("זמני היום").font(.title2.bold())
@@ -150,16 +150,16 @@ public struct ZmanWidgetView: View {
     }
 }
 
-public struct SolarMini: View {
-    public let snapshot: ZmanSnapshot?
-    public let now: Date
+struct SolarMini: View {
+    let snapshot: ZmanSnapshot?
+    let now: Date
 
-    public init(snapshot: ZmanSnapshot?, now: Date) {
+    init(snapshot: ZmanSnapshot?, now: Date) {
         self.snapshot = snapshot
         self.now = now
     }
 
-    public var body: some View {
+    var body: some View {
         GeometryReader { geometry in
             ZStack {
                 Path { path in

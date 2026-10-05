@@ -2,10 +2,10 @@ import CoreLocation
 import Foundation
 import os
 
-public enum HebcalService {
+enum HebcalService {
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim", category: "HebcalService")
 
-    public static let definitions: [ZmanDefinition] = [
+    static let definitions: [ZmanDefinition] = [
         .init(key: "alotHaShachar", hebrewTitle: "עלות השחר", englishTitle: "Alot HaShachar", icon: "moon.stars.fill"),
         .init(key: "misheyakir", hebrewTitle: "משיכיר", englishTitle: "Misheyakir", icon: "eye.fill"),
         .init(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Sunrise", icon: "sunrise.fill"),
@@ -21,17 +21,17 @@ public enum HebcalService {
         .init(key: "candleLighting", hebrewTitle: "כניסת שבת", englishTitle: "Candle Lighting", icon: "flame.fill")
     ]
 
-    public struct Response: Decodable {
-        public let date: String
-        public let times: [String: String]
+    struct Response: Decodable {
+        let date: String
+        let times: [String: String]
     }
 
-    public enum ServiceError: LocalizedError {
+    enum ServiceError: LocalizedError {
         case invalidURL
         case invalidResponse(Int)
         case emptyData
 
-        public var errorDescription: String? {
+        var errorDescription: String? {
             switch self {
             case .invalidURL:
                 return "לא ניתן ליצור בקשה ל-Hebcal."
@@ -43,7 +43,7 @@ public enum HebcalService {
         }
     }
 
-    public static func fetchDays(
+    static func fetchDays(
         location: CLLocation,
         timeZone: TimeZone,
         starting startDate: Date = Date(),
@@ -59,7 +59,7 @@ public enum HebcalService {
         return all.sorted { $0.date < $1.date }
     }
 
-    public static func fetchDay(
+    static func fetchDay(
         location: CLLocation,
         timeZone: TimeZone,
         date: Date
