@@ -3,74 +3,162 @@ import UserNotifications
 import UserNotificationsUI
 
 final class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    private let card = UIView()
+    private let iconView = UIImageView()
+    private let eyebrowLabel = UILabel()
     private let titleLabel = UILabel()
     private let timeLabel = UILabel()
     private let countdownLabel = UILabel()
-    private let horizon = UIView()
+    private let arcLayer = CAShapeLayer()
+    private let sunView = UIImageView(image: UIImage(systemName: "sun.max.fill"))
+    private var targetDate: Date?
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        preferredContentSize = CGSize(width: 390, height: 235)
         view.backgroundColor = UIColor(red: 0.972, green: 0.966, blue: 0.936, alpha: 1)
 
-        titleLabel.font = .preferredFont(forTextStyle: .title2)
-        titleLabel.textAlignment = .right
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor(red: 0.965, green: 0.945, blue: 0.885, alpha: 0.72)
+        card.layer.cornerRadius = 24
+        card.layer.cornerCurve = .continuous
+        view.addSubview(card)
 
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.tintColor = .systemOrange
+        iconView.contentMode = .scaleAspectFit
+
+        eyebrowLabel.translatesAutoresizingMaskIntoConstraints = false
+        eyebrowLabel.font = .preferredFont(forTextStyle: .caption1)
+        eyebrowLabel.textColor = .secondaryLabel
+        eyebrowLabel.textAlignment = .right
+        eyebrowLabel.text = "תזכורת זמן"
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .preferredFont(forTextStyle: .title2)
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.textAlignment = .right
+        titleLabel.numberOfLines = 1
+
+        timeLabel.translatesAutoresizingMaskIntoConstraints = false
         timeLabel.font = .monospacedDigitSystemFont(ofSize: 34, weight: .semibold)
         timeLabel.textAlignment = .right
 
-        countdownLabel.font = .preferredFont(forTextStyle: .headline)
+        countdownLabel.translatesAutoresizingMaskIntoConstraints = false
+        countdownLabel.font = .preferredFont(forTextStyle: .subheadline)
         countdownLabel.textColor = .secondaryLabel
         countdownLabel.textAlignment = .right
 
-        horizon.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.14)
-        horizon.layer.cornerRadius = 14
+        let textStack = UIStackView(arrangedSubviews: [eyebrowLabel, titleLabel, timeLabel, countdownLabel])
+        textStack.translatesAutoresizingMaskIntoConstraints = false
+        textStack.axis = .vertical
+        textStack.spacing = 3
 
-        let stack = UIStackView(arrangedSubviews: [horizon, titleLabel, timeLabel, countdownLabel])
-        stack.axis = .vertical
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+        let header = UIStackView(arrangedSubviews: [textStack, iconView])
+        header.translatesAutoresizingMaskIntoConstraints = false
+        header.axis = .horizontal
+        header.alignment = .top
+        header.spacing = 12
+        header.semanticContentAttribute = .forceRightToLeft
+        card.addSubview(header)
+
+        let horizon = UIView()
+        horizon.translatesAutoresizingMaskIntoConstraints = false
+        horizon.backgroundColor = .clear
+        card.addSubview(horizon)
+
+        arcLayer.fillColor = UIColor.clear.cgColor
+        arcLayer.strokeColor = UIColor.systemOrange.withAlphaComponent(0.34).cgColor
+        arcLayer.lineWidth = 2
+        arcLayer.lineCap = .round
+        horizon.layer.addSublayer(arcLayer)
+
+        sunView.translatesAutoresizingMaskIntoConstraints = false
+        sunView.tintColor = .systemOrange
+        horizon.addSubview(sunView)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 18),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -18),
-            horizon.heightAnchor.constraint(equalToConstant: 42)
+            card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            card.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
+            card.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
+            header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            header.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            iconView.widthAnchor.constraint(equalToConstant: 42),
+            iconView.heightAnchor.constraint(equalToConstant: 42),
+            horizon.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            horizon.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            horizon.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+            horizon.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+            sunView.widthAnchor.constraint(equalToConstant: 22),
+            sunView.heightAnchor.constraint(equalToConstant: 22),
+            sunView.trailingAnchor.constraint(equalTo: horizon.trailingAnchor, constant: -6),
+            sunView.bottomAnchor.constraint(equalTo: horizon.bottomAnchor, constant: -2)
         ])
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let horizon = sunView.superview else { return }
+        let rect = horizon.bounds.insetBy(dx: 8, dy: 4)
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY), controlPoint: CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.25))
+        arcLayer.path = path.cgPath
+        arcLayer.frame = horizon.bounds
     }
 
     func didReceive(_ notification: UNNotification) {
         let content = notification.request.content
         titleLabel.text = content.userInfo["zmanTitle"] as? String ?? content.title
+        iconView.image = UIImage(systemName: content.userInfo["zmanIcon"] as? String ?? "sunset.fill")
 
-        let target = (content.userInfo["zmanTime"] as? Double).map {
-            Date(timeIntervalSince1970: $0)
-        }
-
-        if let target {
+        if let seconds = content.userInfo["zmanTime"] as? Double {
+            let target = Date(timeIntervalSince1970: seconds)
+            targetDate = target
             let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "he_IL")
             formatter.dateFormat = "HH:mm"
             timeLabel.text = formatter.string(from: target)
-
-            let minutes = max(0, Int(ceil(target.timeIntervalSinceNow / 60)))
-            countdownLabel.text = minutes > 0 ? "נותרו \(minutes) דקות" : "הזמן הגיע"
+            updateCountdown()
         } else {
-            timeLabel.text = ""
-            countdownLabel.text = content.body
+            timeLabel.text = content.body
+            countdownLabel.text = ""
         }
+    }
 
-        let image = UIImageView(image: UIImage(systemName: "sunset.fill"))
-        image.tintColor = .systemOrange
-        image.translatesAutoresizingMaskIntoConstraints = false
-        horizon.addSubview(image)
+    private func updateCountdown() {
+        guard let targetDate else { return }
+        let minutes = max(0, Int(ceil(targetDate.timeIntervalSinceNow / 60)))
+        countdownLabel.text = minutes > 0 ? "בעוד \(minutes) דקות" : "הזמן הגיע"
+    }
 
-        NSLayoutConstraint.activate([
-            image.centerXAnchor.constraint(equalTo: horizon.centerXAnchor),
-            image.centerYAnchor.constraint(equalTo: horizon.centerYAnchor),
-            image.widthAnchor.constraint(equalToConstant: 24),
-            image.heightAnchor.constraint(equalToConstant: 24)
-        ])
+    func didReceive(
+        _ response: UNNotificationResponse,
+        completionHandler completion: @escaping (UNNotificationContentExtensionResponseOption) -> Void
+    ) {
+        switch response.actionIdentifier {
+        case "ZMANIM_SNOOZE_5":
+            let original = response.notification.request.content
+            let content = UNMutableNotificationContent()
+            content.title = original.title
+            content.body = "נודניק · " + original.body
+            content.sound = .default
+            content.categoryIdentifier = original.categoryIdentifier
+            content.userInfo = original.userInfo
+            let request = UNNotificationRequest(
+                identifier: "zmanim.snooze." + UUID().uuidString,
+                content: content,
+                trigger: UNTimeIntervalNotificationTrigger(timeInterval: 300, repeats: false)
+            )
+            UNUserNotificationCenter.current().add(request) { _ in
+                completion(.dismiss)
+            }
+        case "ZMANIM_OPEN":
+            completion(.dismissAndForwardAction)
+        default:
+            completion(.dismissAndForwardAction)
+        }
     }
 }
