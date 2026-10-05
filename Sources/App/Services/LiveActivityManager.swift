@@ -1,0 +1,3 @@
+import ActivityKit
+import Foundation
+enum LiveActivityManager { enum ActivityError:Error{case unavailable};static func start(for item:ZmanItem,cityName:String) async throws{guard ActivityAuthorizationInfo().areActivitiesEnabled else{throw ActivityError.unavailable};let attributes=ZmanimActivityAttributes(cityName:cityName);let state=ZmanimActivityAttributes.ContentState(title:item.hebrewTitle,targetDate:item.date,icon:item.icon);_=try Activity<ZmanimActivityAttributes>.request(attributes:attributes,content:ActivityContent(state:state,staleDate:item.date),pushType:nil)};static func endAll() async{for activity in Activity<ZmanimActivityAttributes>.activities{await activity.end(nil,dismissalPolicy:.immediate)}}}
