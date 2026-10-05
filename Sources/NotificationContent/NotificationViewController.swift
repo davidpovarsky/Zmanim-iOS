@@ -12,10 +12,12 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     private let arcLayer = CAShapeLayer()
     private let sunView = UIImageView(image: UIImage(systemName: "sun.max.fill"))
     private var targetDate: Date?
+    private var countdownTimer: Timer?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         preferredContentSize = CGSize(width: 390, height: 235)
+        view.semanticContentAttribute = .forceRightToLeft
         view.backgroundColor = UIColor(red: 0.972, green: 0.966, blue: 0.936, alpha: 1)
 
         card.translatesAutoresizingMaskIntoConstraints = false
@@ -122,6 +124,10 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
             formatter.dateFormat = "HH:mm"
             timeLabel.text = formatter.string(from: target)
             updateCountdown()
+            countdownTimer?.invalidate()
+            countdownTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+                self?.updateCountdown()
+            }
         } else {
             timeLabel.text = content.body
             countdownLabel.text = ""
@@ -139,26 +145,19 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         completionHandler completion: @escaping (UNNotificationContentExtensionResponseOption) -> Void
     ) {
         switch response.actionIdentifier {
-        case "ZMANIM_SNOOZE_5":
-            let original = response.notification.request.content
-            let content = UNMutableNotificationContent()
-            content.title = original.title
-            content.body = "נודניק · " + original.body
-            content.sound = .default
-            content.categoryIdentifier = original.categoryIdentifier
-            content.userInfo = original.userInfo
-            let request = UNNotificationRequest(
-                identifier: "zmanim.snooze." + UUID().uuidString,
-                content: content,
-                trigger: UNTimeIntervalNotificationTrigger(timeInterval: 300, repeats: false)
-            )
+        case NotificationSchedulerConstants.snoozeActionID:
+            let request = ZmanimSnoozeRequest.make(from: response.notification.request.content)
             UNUserNotificationCenter.current().add(request) { _ in
                 completion(.dismiss)
             }
-        case "ZMANIM_OPEN":
+        case NotificationSchedulerConstants.openActionID:
             completion(.dismissAndForwardAction)
         default:
             completion(.dismissAndForwardAction)
         }
+    }
+
+    deinit {
+        countdownTimer?.invalidate()
     }
 }

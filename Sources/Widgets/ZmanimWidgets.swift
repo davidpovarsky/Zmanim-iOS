@@ -1,6 +1,5 @@
 import ActivityKit
 import AppIntents
-import CoreLocation
 import SwiftUI
 import WidgetKit
 
@@ -14,72 +13,22 @@ struct ZmanEntry: TimelineEntry {
     }
 }
 
-final class WidgetLocationLoader: NSObject, CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<CLLocation?, Never>?
-
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyKilometer
-    }
-
-    func location() async -> CLLocation? {
-        guard CLLocationManager.locationServicesEnabled() else { return nil }
-        return await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            manager.requestLocation()
-        }
-    }
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        continuation?.resume(returning: locations.last)
-        continuation = nil
-    }
-
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        continuation?.resume(returning: nil)
-        continuation = nil
-    }
-}
-
 struct ZmanProvider: TimelineProvider {
     func placeholder(in context: Context) -> ZmanEntry {
         ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ZmanEntry) -> Void) {
-        completion(ZmanEntry(date: .now, snapshot: AppGroupStore.loadSnapshot() ?? demoSnapshot, state: nil))
+        completion(ZmanEntry(date: .now, snapshot: AppGroupStore.loadSnapshot(), state: "פתח את האפליקציה לרענון"))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ZmanEntry>) -> Void) {
-        Task {
-            let now = Date()
-
-            if let cached = AppGroupStore.loadSnapshot(), !cached.items.isEmpty {
-                completion(Timeline(entries: [ZmanEntry(date: now, snapshot: cached, state: nil)], policy: .after(now.addingTimeInterval(900))))
-                return
-            }
-
-            let loader = WidgetLocationLoader()
-            if let location = await loader.location() {
-                let timeZone = TimeZone.current
-                do {
-                    let items = try await WidgetHebcal.fetch(location: location, timeZone: timeZone)
-                    let snapshot = ZmanSnapshot(
-                        cityName: "המיקום הנוכחי",
-                        timeZoneID: timeZone.identifier,
-                        latitude: location.coordinate.latitude,
-                        longitude: location.coordinate.longitude,
-                        updatedAt: now,
-                        items: items
-                    )
-                    AppGroupStore.saveSnapshot(snapshot)
-                    completion(Timeline(entries: [ZmanEntry(date: now, snapshot: snapshot, state: nil)], policy: .after(now.addingTimeInterval(900))))
-                    return
-                } catch { }
-            }
-
+        let now = Date()
+        if let cached = AppGroupStore.loadSnapshot(), !cached.items.isEmpty {
+            completion(Timeline(entries: [ZmanEntry(date: now, snapshot: cached, state: nil)], policy: .after(now.addingTimeInterval(900))))
+        } else {
+            // Widgets must not request location or perform network work. The app owns
+            // computation and publishes a validated snapshot through the App Group.
             completion(Timeline(entries: [ZmanEntry(date: now, snapshot: nil, state: "פתח את האפליקציה לרענון")], policy: .after(now.addingTimeInterval(600))))
         }
     }
@@ -97,45 +46,6 @@ struct ZmanProvider: TimelineProvider {
                 ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: now.addingTimeInterval(7200))
             ]
         )
-    }
-}
-
-enum WidgetHebcal {
-    private struct Response: Decodable { let times: [String: String] }
-    private static let definitions: [ZmanDefinition] = [
-        .init(key: "alotHaShachar", hebrewTitle: "עלות השחר", englishTitle: "Alot HaShachar", icon: "moon.stars.fill"),
-        .init(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Sunrise", icon: "sunrise.fill"),
-        .init(key: "sofZmanShma", hebrewTitle: "סוף זמן ק״ש", englishTitle: "Latest Shema", icon: "book.closed.fill"),
-        .init(key: "sofZmanTfilla", hebrewTitle: "סוף זמן תפילה", englishTitle: "Latest Shacharit", icon: "clock.fill"),
-        .init(key: "chatzot", hebrewTitle: "חצות היום", englishTitle: "Chatzot", icon: "sun.max.fill"),
-        .init(key: "minchaGedola", hebrewTitle: "מנחה גדולה", englishTitle: "Mincha Gedola", icon: "sun.haze.fill"),
-        .init(key: "minchaKetana", hebrewTitle: "מנחה קטנה", englishTitle: "Mincha Ketana", icon: "sun.haze.fill"),
-        .init(key: "plagHaMincha", hebrewTitle: "פלג המנחה", englishTitle: "Plag HaMincha", icon: "sunset.fill"),
-        .init(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill"),
-        .init(key: "tzeit7083deg", hebrewTitle: "צאת הכוכבים", englishTitle: "Tzeit", icon: "moon.fill")
-    ]
-
-    static func fetch(location: CLLocation, timeZone: TimeZone) async throws -> [ZmanItem] {
-        var components = URLComponents(string: "https://www.hebcal.com/zmanim")!
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-        components.queryItems = [
-            .init(name: "cfg", value: "json"),
-            .init(name: "latitude", value: String(format: "%.6f", location.coordinate.latitude)),
-            .init(name: "longitude", value: String(format: "%.6f", location.coordinate.longitude)),
-            .init(name: "tzid", value: timeZone.identifier),
-            .init(name: "date", value: formatter.string(from: .now)),
-            .init(name: "sec", value: "1")
-        ]
-        let (data, _) = try await URLSession.shared.data(from: components.url!)
-        let response = try JSONDecoder().decode(Response.self, from: data)
-        let parser = ISO8601DateFormatter()
-        return definitions.compactMap { definition in
-            guard let raw = response.times[definition.key], let date = parser.date(from: raw) else { return nil }
-            return ZmanItem(key: definition.key, hebrewTitle: definition.hebrewTitle, englishTitle: definition.englishTitle, icon: definition.icon, date: date)
-        }.sorted { $0.date < $1.date }
     }
 }
 
@@ -200,7 +110,12 @@ struct ZmanWidgetView: View {
                 if let next = entry.next { Text(next.date, style: .relative).font(.caption).foregroundStyle(.orange) }
             }
             Spacer()
-            SolarMini(snapshot: entry.snapshot, now: entry.date).frame(width: 150, height: 90)
+            if let snapshot = entry.snapshot {
+                SolarMini(snapshot: snapshot, now: entry.date).frame(width: 150, height: 90)
+            } else {
+                ContentUnavailableView("אין נתונים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
+                    .frame(width: 150, height: 90)
+            }
         }
     }
 
@@ -211,8 +126,8 @@ struct ZmanWidgetView: View {
                 Spacer()
                 Text(entry.snapshot?.cityName ?? "").foregroundStyle(.secondary)
             }
-            SolarMini(snapshot: entry.snapshot, now: entry.date).frame(height: 110)
             if let snapshot = entry.snapshot {
+                SolarMini(snapshot: snapshot, now: entry.date).frame(height: 110)
                 ForEach(Array(snapshot.items.filter { $0.date > entry.date }.prefix(5))) { item in
                     HStack {
                         Image(systemName: item.icon).frame(width: 25)
