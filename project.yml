@@ -52,6 +52,7 @@ targets:
       path: Supporting/ZmanimWidgets-Info.plist
       properties:
         CFBundleDisplayName: Zmanim Widgets
+        NSWidgetWantsLocation: true
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
   ZmanimNotificationContent:
@@ -59,6 +60,8 @@ targets:
     platform: iOS
     sources:
       - Sources/NotificationContent
+    resources:
+      - Sources/NotificationContent/MainInterface.storyboard
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.NotificationContent
@@ -69,10 +72,11 @@ targets:
         CFBundleDisplayName: Zmanim Alert
         NSExtension:
           NSExtensionPointIdentifier: com.apple.usernotifications.content-extension
-          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).NotificationViewController"
+          NSExtensionMainStoryboard: MainInterface
           NSExtensionAttributes:
             UNNotificationExtensionCategory: [ZMANIM_ALERT]
-            UNNotificationExtensionInitialContentSizeRatio: 0.55
+            UNNotificationExtensionInitialContentSizeRatio: 0.34
+            UNNotificationExtensionDefaultContentHidden: true
             UNNotificationExtensionUserInteractionEnabled: true
 schemes:
   Zmanim:
