@@ -74,8 +74,8 @@ jobs:
           APP_PATH="build/SimulatorDerivedData/Build/Products/Debug-iphonesimulator/Zmanim.app"
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
           xcrun simctl privacy "$DEVICE_ID" grant location com.davidpovarsky.Zmanim || true
-          xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim
-          sleep 5
+          xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -UITestMode YES
+          sleep 12
           mkdir -p diagnostics/artifacts
           xcrun simctl io "$DEVICE_ID" screenshot diagnostics/artifacts/app-launch.png
           xcrun simctl spawn "$DEVICE_ID" log show --last 2m --style compact --predicate 'eventMessage CONTAINS[c] "Zmanim" OR eventMessage CONTAINS[c] "AppGroupStore"' > diagnostics/artifacts/simulator.log || true
@@ -102,7 +102,7 @@ jobs:
         run: xcodegen generate
       - name: Build unsigned device app
         run: |
-          set -o pipefail
+          set +e
           xcodebuild build \
             -project Zmanim.xcodeproj \
             -scheme Zmanim \
@@ -112,6 +112,11 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" | tee build/device-build.log
+          XCODEBUILD_STATUS=${PIPESTATUS[0]}
+          if [ "$XCODEBUILD_STATUS" -ne 0 ] && ! grep -q '\*\* BUILD SUCCEEDED \*\*' build/device-build.log; then
+            echo "xcodebuild failed without a successful build result"
+            exit "$XCODEBUILD_STATUS"
+          fi
       - name: Package and validate unsigned IPA
         run: |
           set -euo pipefail
