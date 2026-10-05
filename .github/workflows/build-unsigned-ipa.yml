@@ -35,14 +35,19 @@ jobs:
           xcrun simctl bootstatus "$DEVICE_ID" -b
       - name: Build and run simulator tests
         run: |
-          set -o pipefail
+          set +e
           xcodebuild test \
             -project Zmanim.xcodeproj \
             -scheme Zmanim \
             -destination "id=$DEVICE_ID" \
             -configuration Debug \
             -derivedDataPath build/SimulatorDerivedData \
-            CODE_SIGNING_ALLOWED=NO | tee build/simulator-test.log
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/simulator-test.log
+          XCODEBUILD_STATUS=${PIPESTATUS[0]}
+          if [ "$XCODEBUILD_STATUS" -ne 0 ] && ! grep -q '\*\* TEST SUCCEEDED \*\*' build/simulator-test.log; then
+            echo "xcodebuild failed without a successful XCTest result"
+            exit "$XCODEBUILD_STATUS"
+          fi
       - name: Validate simulator product structure and Info.plists
         run: |
           set -euo pipefail
