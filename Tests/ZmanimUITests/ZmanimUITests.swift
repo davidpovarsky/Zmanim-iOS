@@ -38,6 +38,17 @@ final class ZmanimUITests: XCTestCase {
         if banner.waitForExistence(timeout: 8) {
             // Expand notification banner to invoke content extension
             banner.swipeDown()
+            Thread.sleep(forTimeInterval: 1.5)
+
+            // Save screenshot of expanded notification
+            let screenshot = XCUIScreen.main.screenshot()
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.lifetime = .keepAlways
+            attachment.name = "expanded-rich-notification"
+            add(attachment)
+
+            let tmpUrl = URL(fileURLWithPath: "/tmp/expanded-rich-notification.png")
+            try? screenshot.pngRepresentation.write(to: tmpUrl)
 
             // Look for snooze button
             let snoozeButton = springboard.buttons["נודניק 5 דק׳"]

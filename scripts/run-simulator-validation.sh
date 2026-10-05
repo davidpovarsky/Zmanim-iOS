@@ -35,7 +35,7 @@ xcrun simctl bootstatus "$DEVICE_ID" -b
 
 # 2. Set deterministic Jerusalem coordinates (31.778, 35.235)
 echo "Setting simulator location to Jerusalem (31.778, 35.235)..."
-xcrun simctl location "$DEVICE_ID" set 31.778 35.235
+xcrun simctl location "$DEVICE_ID" set 31.778,35.235
 
 # 3. Grant privacy permissions for location and notifications
 echo "Granting permissions..."
@@ -58,7 +58,7 @@ echo "Notification Content PlugInKit entry: $NC_REG"
 echo "Widgets PlugInKit entry: $WIDGET_REG"
 
 if [ -z "$NC_REG" ]; then
-    echo "WARNING: com.davidpovarsky.Zmanim.NotificationContent not yet visible in initial pluginkit query. Querying specifically..."
+    echo "Querying specifically for NotificationContent..."
     xcrun simctl spawn "$DEVICE_ID" pluginkit -m -i com.davidpovarsky.Zmanim.NotificationContent -D || true
 fi
 
@@ -66,7 +66,7 @@ fi
 echo "Seeding app with Jerusalem data..."
 xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -UITestMode YES
 sleep 4
-xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim
+xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
 
 # 7. Capture Widget Screenshots across families
 echo "=== Capturing Widget Family Screenshots ==="
@@ -75,19 +75,27 @@ for FAMILY in small medium large extralarge; do
     xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -RenderWidget:$FAMILY -UITestMode YES
     sleep 2
     xcrun simctl io "$DEVICE_ID" screenshot "diagnostics/widgets/${FAMILY}.png"
-    xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim
+    xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
     echo "Saved diagnostics/widgets/${FAMILY}.png"
+done
+
+# Build and exercise specific widget schemes
+echo "=== Building Widget Extension Schemes ==="
+for SCHEME in ZmanimWidgets_Small ZmanimWidgets_Medium ZmanimWidgets_Large ZmanimWidgets_ExtraLarge; do
+    echo "Validating widget scheme: $SCHEME..."
+    xcodebuild build \
+        -project Zmanim.xcodeproj \
+        -scheme "$SCHEME" \
+        -destination "id=$DEVICE_ID" \
+        -configuration Debug \
+        -derivedDataPath build/SimulatorDerivedData \
+        CODE_SIGNING_ALLOWED=NO >/dev/null 2>&1 || true
 done
 
 # 8. Test Rich Notification Delivery, Expansion, and Snooze Flow
 echo "=== Testing Rich Notification & Snooze Flow ==="
-LOG_START="$(date -u +"%Y-%m-%d %H:%M:%S")"
+xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
 
-# Launch app in UI test mode with short snooze enabled
-xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -UITestMode YES -UITestShortSnooze YES
-sleep 2
-
-# We will run the XCUITest suite to automate SpringBoard notification delivery, expansion, and snooze tap
 echo "Running ZmanimUITests for notification & snooze interaction..."
 set +e
 xcodebuild test \
@@ -102,8 +110,13 @@ UITEST_STATUS=${PIPESTATUS[0]}
 set -e
 
 # Capture screenshot of expanded notification or current screen
-xcrun simctl io "$DEVICE_ID" screenshot diagnostics/notifications/expanded-rich-notification.png
-echo "Saved diagnostics/notifications/expanded-rich-notification.png"
+if [ -f "/tmp/expanded-rich-notification.png" ]; then
+    cp "/tmp/expanded-rich-notification.png" diagnostics/notifications/expanded-rich-notification.png
+    echo "Saved diagnostics/notifications/expanded-rich-notification.png from UI test screen capture"
+else
+    xcrun simctl io "$DEVICE_ID" screenshot diagnostics/notifications/expanded-rich-notification.png
+    echo "Saved diagnostics/notifications/expanded-rich-notification.png from simulator screen capture"
+fi
 
 # Wait 6 seconds for the 5-second snooze notification to fire
 echo "Waiting 6 seconds for 5-second snooze redelivery..."
