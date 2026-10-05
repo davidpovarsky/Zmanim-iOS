@@ -110,6 +110,7 @@ jobs:
       - name: Build unsigned device app
         run: |
           set +e
+          mkdir -p build
           xcodebuild build \
             -project Zmanim.xcodeproj \
             -scheme Zmanim \

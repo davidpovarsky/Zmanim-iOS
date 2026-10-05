@@ -1,9 +1,6 @@
 import Foundation
 import UserNotifications
-
-#if DEBUG
 import os
-#endif
 
 enum NotificationScheduler {
     static let categoryID = NotificationSchedulerConstants.categoryID
