@@ -25,7 +25,8 @@ targets:
     info:
       path: Supporting/Zmanim-Info.plist
       properties:
-        CFBundleDisplayName: זמנים
+        CFBundleDisplayName: Zmanim
+        CFBundleName: Zmanim
         UILaunchScreen: {}
         NSLocationWhenInUseUsageDescription: "המיקום משמש לחישוב זמני היום המדויקים באזור שלך."
         NSSupportsLiveActivities: true
