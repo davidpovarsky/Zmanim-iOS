@@ -6,8 +6,33 @@ enum NotificationScheduler {
  static func configureCategories(){let snooze=UNNotificationAction(identifier:snoozeActionID,title:"נודניק 5 דק׳",options:[]);let open=UNNotificationAction(identifier:openActionID,title:"פתח זמני היום",options:[.foreground]);UNUserNotificationCenter.current().setNotificationCategories([UNNotificationCategory(identifier:categoryID,actions:[snooze,open],intentIdentifiers:[],options:[.customDismissAction])])}
  static func requestAuthorization() async throws->Bool{try await UNUserNotificationCenter.current().requestAuthorization(options:[.alert,.badge,.sound])}
  static func rescheduleIfAuthorized(settings:UserSettings,items:[ZmanItem],timeZone:TimeZone) async {let status=await UNUserNotificationCenter.current().notificationSettings().authorizationStatus;guard status == .authorized || status == .provisional else{return};await schedule(settings:settings,items:items,timeZone:timeZone)}
- static func schedule(settings:UserSettings,items:[ZmanItem],timeZone:TimeZone) async {let center=UNUserNotificationCenter.current();let pending=await center.pendingNotificationRequests();center.removePendingNotificationRequests(withIdentifiers:pending.map(\.identifier).filter{$0.hasPrefix("zmanim.")});var candidates:[(Date,NotificationRule,ZmanItem)]=[];for rule in settings.rules where rule.isEnabled{for item in items where item.key==rule.zmanKey{let fire=item.date.addingTimeInterval(TimeInterval(rule.offsetMinutes*60));if fire>Date().addingTimeInterval(2){candidates.append((fire,rule,item))}}};candidates.sort{$0.0<$1.0};for(index,c) in candidates.prefix(60).enumerated(){let(fire,rule,item)=c;let content=UNMutableNotificationContent();content.title=rule.displayTitle;content.body=body(rule:rule,item:item,timeZone:timeZone);content.sound = .default;content.categoryIdentifier=categoryID;content.userInfo=["zmanTitle":rule.displayTitle,"zmanTime":item.date.timeIntervalSince1970];let trigger=UNTimeIntervalNotificationTrigger(timeInterval:max(1,fire.timeIntervalSinceNow),repeats:false);try? await center.add(.init(identifier:"zmanim.\(index).\(Int(fire.timeIntervalSince1970))",content:content,trigger:trigger))}}
- static func sendTestNotification() async {let c=UNMutableNotificationContent();c.title="שקיעה בעוד 15 דקות";c.body="שקיעה היום בשעה 18:21";c.sound = .default;c.categoryIdentifier=categoryID;c.userInfo=["zmanTitle":"שקיעה","zmanTime":Date().addingTimeInterval(900).timeIntervalSince1970];try? await UNUserNotificationCenter.current().add(.init(identifier:"zmanim.test.\(UUID().uuidString)",content:c,trigger:UNTimeIntervalNotificationTrigger(timeInterval:2,repeats:false)))}
+ static func schedule(settings:UserSettings,items:[ZmanItem],timeZone:TimeZone) async {let center=UNUserNotificationCenter.current();let pending=await center.pendingNotificationRequests();center.removePendingNotificationRequests(withIdentifiers:pending.map(\.identifier).filter{$0.hasPrefix("zmanim.")});var candidates:[(Date,NotificationRule,ZmanItem)]=[];for rule in settings.rules where rule.isEnabled{for item in items where item.key==rule.zmanKey{let fire=item.date.addingTimeInterval(TimeInterval(rule.offsetMinutes*60));if fire>Date().addingTimeInterval(2){candidates.append((fire,rule,item))}}};candidates.sort{$0.0<$1.0};for(index,c) in candidates.prefix(60).enumerated(){let(fire,rule,item)=c;let content=UNMutableNotificationContent();content.title=rule.displayTitle;content.body=body(rule:rule,item:item,timeZone:timeZone);content.sound = .default;content.categoryIdentifier=categoryID;content.userInfo=["zmanTitle":rule.displayTitle,"zmanTime":item.date.timeIntervalSince1970,"zmanIcon":item.icon];let trigger=UNTimeIntervalNotificationTrigger(timeInterval:max(1,fire.timeIntervalSinceNow),repeats:false);try? await center.add(.init(identifier:"zmanim.\(index).\(Int(fire.timeIntervalSince1970))",content:content,trigger:trigger))}}
+ static func sendTestNotification() async {let c=UNMutableNotificationContent();c.title="שקיעה בעוד 15 דקות";c.body="שקיעה היום בשעה 18:21";c.sound = .default;c.categoryIdentifier=categoryID;c.userInfo=["zmanTitle":"שקיעה","zmanTime":Date().addingTimeInterval(900).timeIntervalSince1970,"zmanIcon":"sunset.fill"];try? await UNUserNotificationCenter.current().add(.init(identifier:"zmanim.test.\(UUID().uuidString)",content:c,trigger:UNTimeIntervalNotificationTrigger(timeInterval:2,repeats:false)))}
  private static func body(rule:NotificationRule,item:ZmanItem,timeZone:TimeZone)->String{let f=DateFormatter();f.timeZone=timeZone;f.dateFormat="HH:mm";if rule.offsetMinutes==0{return"הזמן הגיע · \(f.string(from:item.date))"};return"\(abs(rule.offsetMinutes)) דקות \(rule.offsetMinutes < 0 ? "לפני" : "אחרי") · \(f.string(from:item.date))"}
 }
-final class NotificationCoordinator:NSObject,UNUserNotificationCenterDelegate {static let shared=NotificationCoordinator();func install(){UNUserNotificationCenter.current().delegate=self;NotificationScheduler.configureCategories()};func userNotificationCenter(_ center:UNUserNotificationCenter,willPresent notification:UNNotification) async->UNNotificationPresentationOptions{[.banner,.sound]};func userNotificationCenter(_ center:UNUserNotificationCenter,didReceive response:UNNotificationResponse) async {guard response.actionIdentifier==NotificationScheduler.snoozeActionID else{return};let original=response.notification.request.content;let c=UNMutableNotificationContent();c.title=original.title;c.body="נודניק · "+original.body;c.sound = .default;c.categoryIdentifier=NotificationScheduler.categoryID;c.userInfo=original.userInfo;try? await center.add(.init(identifier:"zmanim.snooze.\(UUID().uuidString)",content:c,trigger:UNTimeIntervalNotificationTrigger(timeInterval:300,repeats:false)))}}
+final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationCoordinator()
+    func install() {
+        UNUserNotificationCenter.current().delegate = self
+        NotificationScheduler.configureCategories()
+    }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard response.actionIdentifier == NotificationScheduler.snoozeActionID else { return }
+        let original = response.notification.request.content
+        let content = UNMutableNotificationContent()
+        content.title = original.title
+        content.body = "נודניק · " + original.body
+        content.sound = .default
+        content.categoryIdentifier = NotificationScheduler.categoryID
+        content.userInfo = original.userInfo
+        let request = UNNotificationRequest(
+            identifier: "zmanim.snooze." + UUID().uuidString,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 300, repeats: false)
+        )
+        do { try await center.add(request) } catch { }
+    }
+}
