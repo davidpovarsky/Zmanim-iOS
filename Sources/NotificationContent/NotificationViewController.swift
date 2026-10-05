@@ -1,8 +1,12 @@
+import os
 import UIKit
 import UserNotifications
 import UserNotificationsUI
 
+@objc(NotificationViewController)
 final class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim.NotificationContent", category: "NotificationViewController")
+
     private let card = UIView()
     private let iconView = UIImageView()
     private let eyebrowLabel = UILabel()
@@ -14,11 +18,33 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     private var targetDate: Date?
     private var countdownTimer: Timer?
 
+    #if DEBUG
+    private let sentinelBanner = UILabel()
+    #endif
+
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        #if DEBUG
+        Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD")
+        #endif
+
         preferredContentSize = CGSize(width: 390, height: 235)
         view.semanticContentAttribute = .forceRightToLeft
         view.backgroundColor = UIColor(red: 0.972, green: 0.966, blue: 0.936, alpha: 1)
+
+        #if DEBUG
+        // Visually unmistakable background and sentinel banner in DEBUG
+        sentinelBanner.translatesAutoresizingMaskIntoConstraints = false
+        sentinelBanner.text = "ZMANIM CONTENT EXTENSION LOADED"
+        sentinelBanner.font = .systemFont(ofSize: 13, weight: .heavy)
+        sentinelBanner.textColor = .white
+        sentinelBanner.backgroundColor = .systemIndigo
+        sentinelBanner.textAlignment = .center
+        sentinelBanner.layer.cornerRadius = 6
+        sentinelBanner.clipsToBounds = true
+        view.addSubview(sentinelBanner)
+        #endif
 
         card.translatesAutoresizingMaskIntoConstraints = false
         card.backgroundColor = UIColor(red: 0.965, green: 0.945, blue: 0.885, alpha: 0.72)
@@ -79,7 +105,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         sunView.tintColor = .systemOrange
         horizon.addSubview(sunView)
 
-        NSLayoutConstraint.activate([
+        var constraints = [
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
             card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
             card.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
@@ -97,7 +123,18 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
             sunView.heightAnchor.constraint(equalToConstant: 22),
             sunView.trailingAnchor.constraint(equalTo: horizon.trailingAnchor, constant: -6),
             sunView.bottomAnchor.constraint(equalTo: horizon.bottomAnchor, constant: -2)
+        ]
+
+        #if DEBUG
+        constraints.append(contentsOf: [
+            sentinelBanner.topAnchor.constraint(equalTo: view.topAnchor, constant: 2),
+            sentinelBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            sentinelBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            sentinelBanner.heightAnchor.constraint(equalToConstant: 18)
         ])
+        #endif
+
+        NSLayoutConstraint.activate(constraints)
     }
 
     override func viewDidLayoutSubviews() {
@@ -113,6 +150,12 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
 
     func didReceive(_ notification: UNNotification) {
         let content = notification.request.content
+
+        #if DEBUG
+        let keys = content.userInfo.keys.map { String(describing: $0) }.sorted().joined(separator: ", ")
+        Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE category=\(content.categoryIdentifier, privacy: .public) title=\(content.title, privacy: .public) userInfoKeys=[\(keys, privacy: .public)]")
+        #endif
+
         titleLabel.text = content.userInfo["zmanTitle"] as? String ?? content.title
         iconView.image = UIImage(systemName: content.userInfo["zmanIcon"] as? String ?? "sunset.fill")
 
@@ -144,10 +187,21 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         _ response: UNNotificationResponse,
         completionHandler completion: @escaping (UNNotificationContentExtensionResponseOption) -> Void
     ) {
+        #if DEBUG
+        Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_ACTION actionIdentifier=\(response.actionIdentifier, privacy: .public)")
+        #endif
+
         switch response.actionIdentifier {
         case NotificationSchedulerConstants.snoozeActionID:
             let request = ZmanimSnoozeRequest.make(from: response.notification.request.content)
-            UNUserNotificationCenter.current().add(request) { _ in
+            UNUserNotificationCenter.current().add(request) { error in
+                #if DEBUG
+                if let error {
+                    Self.logger.error("Failed to add snooze request: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    Self.logger.notice("Snooze request added successfully: \(request.identifier, privacy: .public)")
+                }
+                #endif
                 completion(.dismiss)
             }
         case NotificationSchedulerConstants.openActionID:

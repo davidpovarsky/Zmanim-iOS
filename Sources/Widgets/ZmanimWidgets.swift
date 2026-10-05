@@ -1,49 +1,179 @@
 import ActivityKit
 import AppIntents
+import CoreLocation
+import os
 import SwiftUI
 import WidgetKit
 
-struct ZmanEntry: TimelineEntry {
-    let date: Date
-    let snapshot: ZmanSnapshot?
-    let state: String?
-
-    var next: ZmanItem? {
-        snapshot?.items.first(where: { $0.date > date })
-    }
-}
-
 struct ZmanProvider: TimelineProvider {
+    private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim.Widgets", category: "ZmanProvider")
+
     func placeholder(in context: Context) -> ZmanEntry {
         ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ZmanEntry) -> Void) {
-        completion(ZmanEntry(date: .now, snapshot: AppGroupStore.loadSnapshot(), state: "פתח את האפליקציה לרענון"))
+        if let cached = AppGroupStore.loadSnapshot(), !cached.items.isEmpty {
+            completion(ZmanEntry(date: .now, snapshot: cached, state: nil))
+        } else {
+            completion(ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil))
+        }
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ZmanEntry>) -> Void) {
-        let now = Date()
-        if let cached = AppGroupStore.loadSnapshot(), !cached.items.isEmpty {
-            completion(Timeline(entries: [ZmanEntry(date: now, snapshot: cached, state: nil)], policy: .after(now.addingTimeInterval(900))))
-        } else {
-            // Widgets must not request location or perform network work. The app owns
-            // computation and publishes a validated snapshot through the App Group.
-            completion(Timeline(entries: [ZmanEntry(date: now, snapshot: nil, state: "פתח את האפליקציה לרענון")], policy: .after(now.addingTimeInterval(600))))
+        Task { @MainActor in
+            let now = Date()
+            let cached = AppGroupStore.loadSnapshot()
+
+            // 1. Fast path: fresh valid snapshot from today
+            if let cached, isSnapshotFresh(cached, now: now) {
+                #if DEBUG
+                Self.logger.debug("Using fresh App Group snapshot (\(cached.items.count) items)")
+                #endif
+                completion(makeTimeline(snapshot: cached, now: now, state: nil))
+                return
+            }
+
+            // 2. Refresh path: missing, stale, or different-day snapshot
+            let fetcher = WidgetLocationFetcher()
+            let state = fetcher.currentState
+
+            #if DEBUG
+            Self.logger.debug("Attempting widget refresh. Location state: \(String(describing: state), privacy: .public)")
+            #endif
+
+            if case .authorized = state {
+                if let location = await fetcher.requestOneShotLocation(timeoutSeconds: 4.0) {
+                    let timeZone = TimeZone.current
+                    do {
+                        let items = try await HebcalService.fetchDays(
+                            location: location,
+                            timeZone: timeZone,
+                            starting: now,
+                            count: 2
+                        )
+                        if !items.isEmpty {
+                            let snapshot = ZmanSnapshot(
+                                cityName: "המיקום הנוכחי",
+                                timeZoneID: timeZone.identifier,
+                                latitude: location.coordinate.latitude,
+                                longitude: location.coordinate.longitude,
+                                updatedAt: now,
+                                items: items
+                            )
+                            // Best-effort cache save (does not fail if App Group is unavailable)
+                            AppGroupStore.saveSnapshot(snapshot)
+                            #if DEBUG
+                            Self.logger.notice("Widget successfully fetched \(items.count) zmanim from Hebcal")
+                            #endif
+                            completion(makeTimeline(snapshot: snapshot, now: now, state: nil))
+                            return
+                        }
+                    } catch {
+                        #if DEBUG
+                        Self.logger.error("Widget Hebcal fetch failed: \(error.localizedDescription, privacy: .public)")
+                        #endif
+                    }
+                }
+            }
+
+            // 3. Fallback strategy:
+            // If stale cache exists, display stale cache with update note
+            if let cached, !cached.items.isEmpty {
+                #if DEBUG
+                Self.logger.notice("Displaying stale cache as fallback")
+                #endif
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm"
+                formatter.timeZone = cached.timeZone
+                let timeStr = formatter.string(from: cached.updatedAt)
+                completion(makeTimeline(snapshot: cached, now: now, state: "עודכן ב-\(timeStr)"))
+                return
+            }
+
+            // 4. No cache and no fresh data: display clear explanatory state
+            let recoveryMessage: String
+            switch state {
+            case .appAuthorizedWidgetDenied:
+                recoveryMessage = "יש לאשר מיקום בווידג'ט"
+            case .deniedOrRestricted:
+                recoveryMessage = "נדרשת הרשאת מיקום"
+            case .notDetermined:
+                recoveryMessage = "פתח את האפליקציה לרענון"
+            default:
+                recoveryMessage = "אין נתוני זמנים זמינים"
+            }
+
+            #if DEBUG
+            Self.logger.notice("Displaying empty recovery state: \(recoveryMessage, privacy: .public)")
+            #endif
+            let entry = ZmanEntry(date: now, snapshot: nil, state: recoveryMessage)
+            completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300))))
         }
+    }
+
+    private func isSnapshotFresh(_ snapshot: ZmanSnapshot, now: Date) -> Bool {
+        guard !snapshot.items.isEmpty else { return false }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = snapshot.timeZone
+        // Snapshot is considered fresh if it was updated today and has upcoming items or is recent
+        let isToday = cal.isDate(snapshot.updatedAt, inSameDayAs: now)
+        let hasUpcoming = snapshot.items.contains(where: { $0.date > now })
+        return isToday && hasUpcoming
+    }
+
+    private func makeTimeline(snapshot: ZmanSnapshot, now: Date, state: String?) -> Timeline<ZmanEntry> {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = snapshot.timeZone
+
+        // Create entries for now and at upcoming zmanim transitions today
+        var dates: [Date] = [now]
+        let upcomingItems = snapshot.items.filter { $0.date > now }
+
+        for item in upcomingItems {
+            dates.append(item.date)
+        }
+
+        // Add midnight rollover entry
+        if let nextMidnight = cal.nextDate(after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime) {
+            dates.append(nextMidnight)
+        }
+
+        dates.sort()
+        // Deduplicate timestamps within 10 seconds of each other
+        var uniqueDates: [Date] = []
+        for d in dates {
+            if let last = uniqueDates.last {
+                if d.timeIntervalSince(last) >= 10 {
+                    uniqueDates.append(d)
+                }
+            } else {
+                uniqueDates.append(d)
+            }
+        }
+
+        let entries = uniqueDates.map { ZmanEntry(date: $0, snapshot: snapshot, state: state) }
+
+        // Refresh at the next day rollover or in at most 4 hours
+        let nextMidnight = cal.nextDate(after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime)
+        let refreshDate = min(nextMidnight ?? now.addingTimeInterval(14400), now.addingTimeInterval(14400))
+
+        return Timeline(entries: entries, policy: .after(refreshDate))
     }
 
     private var demoSnapshot: ZmanSnapshot {
         let now = Date()
         return ZmanSnapshot(
-            cityName: "זמנים",
-            timeZoneID: TimeZone.current.identifier,
-            latitude: 0,
-            longitude: 0,
+            cityName: "ירושלים",
+            timeZoneID: TimeZone(identifier: "Asia/Jerusalem")?.identifier ?? TimeZone.current.identifier,
+            latitude: 31.778,
+            longitude: 35.235,
             updatedAt: now,
             items: [
                 ZmanItem(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Sunrise", icon: "sunrise.fill", date: now.addingTimeInterval(-7200)),
-                ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: now.addingTimeInterval(7200))
+                ZmanItem(key: "chatzot", hebrewTitle: "חצות היום", englishTitle: "Chatzot", icon: "sun.max.fill", date: now.addingTimeInterval(3600)),
+                ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: now.addingTimeInterval(7200)),
+                ZmanItem(key: "tzeit7083deg", hebrewTitle: "צאת הכוכבים", englishTitle: "Tzeit", icon: "moon.fill", date: now.addingTimeInterval(9000))
             ]
         )
     }
@@ -59,140 +189,6 @@ struct ZmanimWidget: Widget {
         .configurationDisplayName("זמני היום")
         .description("הזמן הבא ומסלול השמש.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryInline, .accessoryCircular, .accessoryRectangular])
-    }
-}
-
-struct ZmanWidgetView: View {
-    @Environment(\.widgetFamily) private var family
-    let entry: ZmanEntry
-
-    var body: some View {
-        switch family {
-        case .accessoryInline:
-            Text(inlineText)
-        case .accessoryCircular:
-            Gauge(value: progress) { Image(systemName: "sun.max.fill") }
-                .gaugeStyle(.accessoryCircularCapacity)
-        case .accessoryRectangular:
-            VStack(alignment: .leading) {
-                Text(entry.next?.hebrewTitle ?? "זמנים").bold()
-                Text(nextTime).monospacedDigit()
-                if let next = entry.next { Text(next.date, style: .relative).font(.caption2) }
-            }
-        case .systemSmall:
-            small
-        case .systemMedium:
-            medium
-        default:
-            large
-        }
-    }
-
-    private var small: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("זמני היום").font(.headline)
-            Spacer()
-            Image(systemName: entry.next?.icon ?? "sun.max.fill").font(.title2).foregroundStyle(.orange)
-            Text(entry.next?.hebrewTitle ?? entry.state ?? "טוען…").font(.headline)
-            Text(nextTime).font(.title.monospacedDigit().bold())
-            Button(intent: ToggleQuickReminderIntent()) {
-                Image(systemName: AppGroupStore.quickReminderEnabled ? "bell.fill" : "bell")
-            }
-        }
-    }
-
-    private var medium: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(entry.snapshot?.cityName ?? "זמני היום").font(.caption).foregroundStyle(.secondary)
-                Text(entry.next?.hebrewTitle ?? entry.state ?? "טוען…").font(.title3.bold())
-                Text(nextTime).font(.title.monospacedDigit().bold())
-                if let next = entry.next { Text(next.date, style: .relative).font(.caption).foregroundStyle(.orange) }
-            }
-            Spacer()
-            if let snapshot = entry.snapshot {
-                SolarMini(snapshot: snapshot, now: entry.date).frame(width: 150, height: 90)
-            } else {
-                ContentUnavailableView("אין נתונים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
-                    .frame(width: 150, height: 90)
-            }
-        }
-    }
-
-    private var large: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("זמני היום").font(.title2.bold())
-                Spacer()
-                Text(entry.snapshot?.cityName ?? "").foregroundStyle(.secondary)
-            }
-            if let snapshot = entry.snapshot {
-                SolarMini(snapshot: snapshot, now: entry.date).frame(height: 110)
-                ForEach(Array(snapshot.items.filter { $0.date > entry.date }.prefix(5))) { item in
-                    HStack {
-                        Image(systemName: item.icon).frame(width: 25)
-                        Text(item.hebrewTitle)
-                        Spacer()
-                        Text(time(item.date)).monospacedDigit()
-                    }
-                }
-            } else {
-                ContentUnavailableView("אין עדיין נתונים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
-            }
-            Spacer()
-        }
-    }
-
-    private var inlineText: String { "\(entry.next?.hebrewTitle ?? "זמנים") \(nextTime)" }
-    private var nextTime: String { entry.next.map { time($0.date) } ?? "--:--" }
-
-    private func time(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeZone = entry.snapshot?.timeZone ?? .current
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
-    }
-
-    private var progress: Double {
-        guard let sunrise = entry.snapshot?.items.first(where: { $0.key == "sunrise" })?.date,
-              let sunset = entry.snapshot?.items.first(where: { $0.key == "sunset" })?.date,
-              sunset > sunrise else { return 0 }
-        return min(max(entry.date.timeIntervalSince(sunrise) / sunset.timeIntervalSince(sunrise), 0), 1)
-    }
-}
-
-private struct SolarMini: View {
-    let snapshot: ZmanSnapshot?
-    let now: Date
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Path { path in
-                    path.move(to: CGPoint(x: geometry.size.width - 8, y: geometry.size.height - 8))
-                    path.addQuadCurve(
-                        to: CGPoint(x: 8, y: geometry.size.height - 8),
-                        control: CGPoint(x: geometry.size.width / 2, y: -geometry.size.height / 2)
-                    )
-                }
-                .stroke(.secondary.opacity(0.25), lineWidth: 2)
-
-                Circle()
-                    .fill(.orange)
-                    .frame(width: 18, height: 18)
-                    .position(
-                        x: geometry.size.width * (1 - CGFloat(progress)),
-                        y: max(10, geometry.size.height - 8 - sin(.pi * progress) * (geometry.size.height - 20))
-                    )
-            }
-        }
-    }
-
-    private var progress: Double {
-        guard let sunrise = snapshot?.items.first(where: { $0.key == "sunrise" })?.date,
-              let sunset = snapshot?.items.first(where: { $0.key == "sunset" })?.date,
-              sunset > sunrise else { return 0 }
-        return min(max(now.timeIntervalSince(sunrise) / sunset.timeIntervalSince(sunrise), 0), 1)
     }
 }
 

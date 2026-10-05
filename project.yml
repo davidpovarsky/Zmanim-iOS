@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "2"
+    CURRENT_PROJECT_VERSION: "3"
 targets:
   Zmanim:
     type: application
@@ -52,7 +52,7 @@ targets:
       path: Supporting/ZmanimWidgets-Info.plist
       properties:
         CFBundleDisplayName: Zmanim Widgets
-        NSWidgetWantsLocation: false
+        NSWidgetWantsLocation: true
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
   ZmanimNotificationContent:
@@ -76,7 +76,7 @@ targets:
           NSExtensionMainStoryboard: MainInterface
           NSExtensionAttributes:
             UNNotificationExtensionCategory: [ZMANIM_ALERT]
-            UNNotificationExtensionInitialContentSizeRatio: 0.34
+            UNNotificationExtensionInitialContentSizeRatio: 0.6
             UNNotificationExtensionDefaultContentHidden: true
             UNNotificationExtensionUserInteractionEnabled: true
   ZmanimTests:
@@ -89,6 +89,17 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.Tests
+  ZmanimUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - Tests/ZmanimUITests
+    dependencies:
+      - target: Zmanim
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.UITests
+        TEST_TARGET_NAME: Zmanim
 schemes:
   Zmanim:
     build:
@@ -97,8 +108,60 @@ schemes:
         ZmanimWidgets: all
         ZmanimNotificationContent: all
         ZmanimTests: [test]
+        ZmanimUITests: [test]
     test:
       targets:
         - ZmanimTests
+        - ZmanimUITests
     archive:
       config: Release
+  ZmanimWidgets:
+    build:
+      targets:
+        ZmanimWidgets: all
+    run:
+      config: Debug
+      environmentVariables:
+        _XCWidgetKind: ZmanimWidget
+        _XCWidgetFamily: systemMedium
+        _XCWidgetDefaultView: timeline
+  ZmanimWidgets_Small:
+    build:
+      targets:
+        ZmanimWidgets: all
+    run:
+      config: Debug
+      environmentVariables:
+        _XCWidgetKind: ZmanimWidget
+        _XCWidgetFamily: systemSmall
+        _XCWidgetDefaultView: timeline
+  ZmanimWidgets_Medium:
+    build:
+      targets:
+        ZmanimWidgets: all
+    run:
+      config: Debug
+      environmentVariables:
+        _XCWidgetKind: ZmanimWidget
+        _XCWidgetFamily: systemMedium
+        _XCWidgetDefaultView: timeline
+  ZmanimWidgets_Large:
+    build:
+      targets:
+        ZmanimWidgets: all
+    run:
+      config: Debug
+      environmentVariables:
+        _XCWidgetKind: ZmanimWidget
+        _XCWidgetFamily: systemLarge
+        _XCWidgetDefaultView: timeline
+  ZmanimWidgets_ExtraLarge:
+    build:
+      targets:
+        ZmanimWidgets: all
+    run:
+      config: Debug
+      environmentVariables:
+        _XCWidgetKind: ZmanimWidget
+        _XCWidgetFamily: systemExtraLarge
+        _XCWidgetDefaultView: timeline

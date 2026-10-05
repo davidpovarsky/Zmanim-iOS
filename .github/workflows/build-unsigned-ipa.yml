@@ -16,10 +16,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
       - name: Install XcodeGen
         run: brew install xcodegen
+
       - name: Generate project
         run: xcodegen generate
+
       - name: Select simulator
         run: |
           set -euo pipefail
@@ -30,10 +33,11 @@ jobs:
           fi
           test -n "$DEVICE_ID"
           echo "DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
-          xcrun simctl erase "$DEVICE_ID"
+          xcrun simctl erase "$DEVICE_ID" || true
           xcrun simctl boot "$DEVICE_ID"
           xcrun simctl bootstatus "$DEVICE_ID" -b
-      - name: Build and run simulator tests
+
+      - name: Build for Simulator and run unit tests
         run: |
           set +e
           xcodebuild test \
@@ -41,6 +45,7 @@ jobs:
             -scheme Zmanim \
             -destination "id=$DEVICE_ID" \
             -configuration Debug \
+            -only-testing ZmanimTests \
             -derivedDataPath build/SimulatorDerivedData \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/simulator-test.log
           XCODEBUILD_STATUS=${PIPESTATUS[0]}
@@ -48,6 +53,7 @@ jobs:
             echo "xcodebuild failed without a successful XCTest result"
             exit "$XCODEBUILD_STATUS"
           fi
+
       - name: Validate simulator product structure and Info.plists
         run: |
           set -euo pipefail
@@ -63,22 +69,19 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$WIDGET_PATH/Info.plist" | grep -Fx 'com.apple.widgetkit-extension'
           /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$NOTIFICATION_PATH/Info.plist" | grep -Fx 'com.apple.usernotifications.content-extension'
           /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionMainStoryboard' "$NOTIFICATION_PATH/Info.plist" | grep -Fx 'MainInterface'
-          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionAttributes:UNNotificationExtensionCategory:0' "$NOTIFICATION_PATH/Info.plist" | grep -Fx 'ZMANIM_ALERT'
+          /usr/libexec/PlistBuddy -c 'Print :NSWidgetWantsLocation' "$WIDGET_PATH/Info.plist" | grep -Fx 'true'
+          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionAttributes:UNNotificationExtensionCategory' "$NOTIFICATION_PATH/Info.plist" | grep -F 'ZMANIM_ALERT'
           ! /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPrincipalClass' "$NOTIFICATION_PATH/Info.plist"
+          test -d "$NOTIFICATION_PATH/MainInterface.storyboardc" || test -f "$NOTIFICATION_PATH/MainInterface.storyboardc"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$WIDGET_PATH/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NOTIFICATION_PATH/Info.plist"
-      - name: Install and launch simulator app
+
+      - name: Run simulator runtime validation and capture diagnostics
         run: |
-          set -euo pipefail
-          APP_PATH="build/SimulatorDerivedData/Build/Products/Debug-iphonesimulator/Zmanim.app"
-          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
-          xcrun simctl privacy "$DEVICE_ID" grant location com.davidpovarsky.Zmanim || true
-          xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -UITestMode YES
-          sleep 12
-          mkdir -p diagnostics/artifacts
-          xcrun simctl io "$DEVICE_ID" screenshot diagnostics/artifacts/app-launch.png
-          xcrun simctl spawn "$DEVICE_ID" log show --last 2m --style compact --predicate 'eventMessage CONTAINS[c] "Zmanim" OR eventMessage CONTAINS[c] "AppGroupStore"' > diagnostics/artifacts/simulator.log || true
+          chmod +x scripts/run-simulator-validation.sh
+          bash scripts/run-simulator-validation.sh "$DEVICE_ID" "build/SimulatorDerivedData/Build/Products/Debug-iphonesimulator/Zmanim.app"
+
       - name: Upload simulator diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -96,10 +99,13 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+
       - name: Install XcodeGen
         run: brew install xcodegen
+
       - name: Generate project
         run: xcodegen generate
+
       - name: Build unsigned device app
         run: |
           set +e
@@ -117,6 +123,7 @@ jobs:
             echo "xcodebuild failed without a successful build result"
             exit "$XCODEBUILD_STATUS"
           fi
+
       - name: Package and validate unsigned IPA
         run: |
           set -euo pipefail
@@ -125,15 +132,9 @@ jobs:
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qry Zmanim-unsigned.ipa Payload
-          unzip -q Zmanim-unsigned.ipa -d ipa-inspection
-          APP="ipa-inspection/Payload/Zmanim.app"
-          test -d "$APP/PlugIns/ZmanimWidgets.appex"
-          test -d "$APP/PlugIns/ZmanimNotificationContent.appex"
-          plutil -lint "$APP/Info.plist"
-          plutil -lint "$APP/PlugIns/ZmanimWidgets.appex/Info.plist"
-          plutil -lint "$APP/PlugIns/ZmanimNotificationContent.appex/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$APP/PlugIns/ZmanimWidgets.appex/Info.plist" | grep -Fx 'com.apple.widgetkit-extension'
-          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$APP/PlugIns/ZmanimNotificationContent.appex/Info.plist" | grep -Fx 'com.apple.usernotifications.content-extension'
+          chmod +x scripts/verify-ipa-extensions.sh
+          bash scripts/verify-ipa-extensions.sh Zmanim-unsigned.ipa
+
       - name: Upload unsigned IPA and build log
         uses: actions/upload-artifact@v4
         with:

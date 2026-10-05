@@ -106,6 +106,7 @@ enum NotificationScheduler {
 
 final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationCoordinator()
+    private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim", category: "NotificationCoordinator")
 
     func install() {
         UNUserNotificationCenter.current().delegate = self
@@ -119,6 +120,27 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         [.banner, .sound]
     }
 
-    // Action ownership intentionally lives in NotificationViewController. Keeping this
-    // delegate free of didReceive prevents the snooze request from being scheduled twice.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        #if DEBUG
+        Self.logger.notice("NotificationCoordinator didReceive response action: \(response.actionIdentifier, privacy: .public)")
+        #endif
+        // Primary action owner is NotificationViewController (which calls completion(.dismiss)).
+        // This fallback only runs if the rich extension is not loaded or user performs action from default UI.
+        if response.actionIdentifier == NotificationSchedulerConstants.snoozeActionID {
+            let request = ZmanimSnoozeRequest.make(from: response.notification.request.content)
+            do {
+                try await center.add(request)
+                #if DEBUG
+                Self.logger.notice("NotificationCoordinator fallback scheduled snooze: \(request.identifier, privacy: .public)")
+                #endif
+            } catch {
+                #if DEBUG
+                Self.logger.error("NotificationCoordinator fallback failed to schedule snooze: \(error.localizedDescription, privacy: .public)")
+                #endif
+            }
+        }
+    }
 }
