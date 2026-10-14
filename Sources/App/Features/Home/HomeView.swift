@@ -106,9 +106,12 @@ public struct HomeView: View {
                 ProgressView().tint(textColor)
             } else {
                 HStack(spacing: 6) {
-                    Label(model.cityName, systemImage: "location.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(textColor.opacity(0.85))
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.fill")
+                        Text(model.cityName)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(textColor.opacity(0.85))
                     Text("·")
                         .foregroundStyle(textColor.opacity(0.60))
                     Text(model.weatherModel.condition.rawValue)
@@ -262,9 +265,12 @@ private struct SolarHero: View {
             Text(time(now))
                 .font(.system(size: 44, weight: .regular, design: .rounded))
                 .monospacedDigit()
-            Label(city, systemImage: "location.fill")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Image(systemName: "location.fill")
+                Text(city)
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
     }
 

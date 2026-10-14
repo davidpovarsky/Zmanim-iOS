@@ -33,7 +33,7 @@ final class ZmanimUITests: XCTestCase {
             springboard.alerts.buttons["אישור"]
         ]
         for btn in candidates {
-            if btn.waitForExistence(timeout: 1.5) {
+            if btn.exists {
                 btn.tap()
                 break
             }
