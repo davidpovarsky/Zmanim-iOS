@@ -158,8 +158,8 @@ final class ZmanimUITests: XCTestCase {
 
         dismissPermissionAlertIfPresent(springboard: springboard)
 
-        // Allow async scheduling task in app to complete before backgrounding
-        Thread.sleep(forTimeInterval: 1.0)
+        // Ensure async scheduling task in app has completed adding request to UNUserNotificationCenter before backgrounding
+        Thread.sleep(forTimeInterval: 2.0)
 
         // Send app to background
         XCUIDevice.shared.press(.home)
@@ -173,6 +173,9 @@ final class ZmanimUITests: XCTestCase {
         let snoozeButton = springboard.buttons["נודניק 5 דק׳"]
         XCTAssertTrue(snoozeButton.waitForExistence(timeout: 10), "Snooze action button must exist while app is in background")
         snoozeButton.tap()
+
+        // Mandatory assertion: Containing app must remain alive without crashing after pressing snooze while in background
+        XCTAssertNotEqual(app.state, .notRunning, "Containing app must not crash when snooze is tapped in background")
 
         // Wait for previous notification overlay to dismiss before expecting redelivery
         let oldBanner = springboard.descendants(matching: .any).matching(identifier: "NotificationShortLookView").firstMatch

@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import UserNotifications
 import os
 
@@ -139,6 +140,7 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
 
         switch actionID {
         case NotificationSchedulerConstants.snoozeActionID:
+            let bgTask = UIApplication.shared.beginBackgroundTask(withName: "scheduleSnooze") { }
             let request = ZmanimSnoozeRequest.make(
                 from: response.notification.request.content,
                 originalIdentifier: originalID
@@ -152,6 +154,9 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
                 }
                 #endif
                 completionHandler()
+                if bgTask != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                }
             }
         case NotificationSchedulerConstants.openActionID:
             #if DEBUG

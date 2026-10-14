@@ -1,6 +1,7 @@
 import Combine
 import CoreLocation
 import Foundation
+import UIKit
 import WidgetKit
 
 @MainActor
@@ -68,6 +69,9 @@ final class AppModel: ObservableObject {
     public func start() {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestMode") {
+            Task {
+                _ = try? await NotificationScheduler.requestAuthorization()
+            }
             if !todayItems.isEmpty {
                 cityName = "ירושלים"
                 timeZone = TimeZone(identifier: "Asia/Jerusalem") ?? .current
@@ -196,6 +200,12 @@ final class AppModel: ObservableObject {
     }
 
     public func sendTestNotification() async {
+        let bgTask = UIApplication.shared.beginBackgroundTask(withName: "sendTestNotification") { }
+        defer {
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+            }
+        }
         if (try? await NotificationScheduler.requestAuthorization()) == true {
             await NotificationScheduler.sendTestNotification()
         }
