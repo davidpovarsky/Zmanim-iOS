@@ -52,14 +52,7 @@ public struct SkyView: View {
         let policy = policy
         TimelineView(.periodic(from: .now, by: 60)) { light in
             TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !policy.isAnimating)) { motion in
-                let currentMotionTime: TimeInterval
-                if let override = motionTimeOverride {
-                    currentMotionTime = override
-                } else if reduceMotion {
-                    currentMotionTime = 0
-                } else {
-                    currentMotionTime = clock.time(at: motion.date)
-                }
+                let currentMotionTime: TimeInterval = motionTimeOverride ?? (reduceMotion ? 0 : clock.time(at: motion.date))
 
                 let scene = SkyScene(
                     date: date ?? light.date,
