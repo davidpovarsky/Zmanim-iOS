@@ -64,11 +64,11 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - path: Sources/NotificationContent/NotificationViewController.swift
-      - path: Sources/Shared/SnoozeRequest.swift
-      - path: Sources/Shared/SolarArcGeometry.swift
+      - Sources/NotificationContent
+      - Sources/Shared/SnoozeRequest.swift
+      - Sources/Shared/SolarArcGeometry.swift
     resources:
-      - path: Sources/NotificationContent/MainInterface.storyboard
+      - Sources/NotificationContent/MainInterface.storyboard
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.NotificationContent
