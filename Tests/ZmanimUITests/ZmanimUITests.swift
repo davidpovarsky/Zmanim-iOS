@@ -150,6 +150,9 @@ final class ZmanimUITests: XCTestCase {
 
         dismissPermissionAlertIfPresent(springboard: springboard)
 
+        // Allow async scheduling task in app to complete before backgrounding
+        Thread.sleep(forTimeInterval: 1.0)
+
         // Send app to background
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 1.0)

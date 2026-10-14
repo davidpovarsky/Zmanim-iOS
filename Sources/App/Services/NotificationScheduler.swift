@@ -90,7 +90,7 @@ enum NotificationScheduler {
         try? await UNUserNotificationCenter.current().add(UNNotificationRequest(
             identifier: "zmanim.test.\(UUID().uuidString)",
             content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
         ))
     }
 
