@@ -48,11 +48,21 @@ final class AppModel: ObservableObject {
         #endif
 
         NotificationCoordinator.shared.install()
+        #if DEBUG
+        if !ProcessInfo.processInfo.arguments.contains("-UITestMode") {
+            locationService.onLocation = { [weak self] location in
+                Task { @MainActor in
+                    await self?.load(location: location)
+                }
+            }
+        }
+        #else
         locationService.onLocation = { [weak self] location in
             Task { @MainActor in
                 await self?.load(location: location)
             }
         }
+        #endif
     }
 
     public func start() {
