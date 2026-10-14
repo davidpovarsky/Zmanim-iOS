@@ -117,9 +117,14 @@ final class ZmanimUITests: XCTestCase {
 
         // 6. Mandatory assertion: Containing app MUST NOT crash
         XCTAssertTrue(
-            app.state == .runningForeground || app.state == .runningBackground,
-            "Containing application must remain alive without crashing after pressing snooze in foreground"
+            app.wait(for: .runningForeground, timeout: 5) || (app.state != .notRunning && app.state != .unknown),
+            "Containing application must remain alive without crashing after pressing snooze in foreground (current state: \(app.state.rawValue))"
         )
+        XCTAssertNotEqual(app.state, .notRunning, "Containing app must not terminate or crash after pressing snooze in foreground")
+
+        // Wait for previous notification overlay to fully disappear before expecting redelivery
+        let oldBanner = springboard.descendants(matching: .any).matching(identifier: "NotificationShortLookView").firstMatch
+        _ = oldBanner.waitForNonExistence(timeout: 3)
 
         // 7. Mandatory assertion: Snooze MUST be redelivered (5-second short snooze interval in test mode)
         let redeliveredBanner = springboard.descendants(matching: .any).matching(identifier: "NotificationShortLookView").firstMatch
@@ -168,6 +173,10 @@ final class ZmanimUITests: XCTestCase {
         let snoozeButton = springboard.buttons["נודניק 5 דק׳"]
         XCTAssertTrue(snoozeButton.waitForExistence(timeout: 10), "Snooze action button must exist while app is in background")
         snoozeButton.tap()
+
+        // Wait for previous notification overlay to dismiss before expecting redelivery
+        let oldBanner = springboard.descendants(matching: .any).matching(identifier: "NotificationShortLookView").firstMatch
+        _ = oldBanner.waitForNonExistence(timeout: 3)
 
         // Wait for redelivery
         let redeliveredBanner = springboard.descendants(matching: .any).matching(identifier: "NotificationShortLookView").firstMatch

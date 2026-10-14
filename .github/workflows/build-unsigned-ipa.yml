@@ -156,6 +156,7 @@ jobs:
           name: simulator-validation-diagnostics
           path: |
             build/simulator-test.log
+            build/*.log
             diagnostics/
             build/SimulatorDerivedData/Build/Products/Debug-iphonesimulator/Zmanim.app/**/Info.plist
           if-no-files-found: warn
