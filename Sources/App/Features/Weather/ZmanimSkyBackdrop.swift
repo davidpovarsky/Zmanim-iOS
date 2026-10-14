@@ -80,3 +80,24 @@ public struct ZmanimSkyBackdrop: View {
         )
     }
 }
+
+extension WeatherCondition {
+    var skyCondition: SkyWeatherCondition {
+        switch self {
+        case .clearDay, .clearNight, .sunrise, .sunset:
+            return .clear
+        case .partlyCloudyDay:
+            return .partlyCloudy
+        case .overcastDay, .cloudyNight:
+            return .overcast
+        case .rain:
+            return .rain
+        case .snow:
+            return .snow
+        case .fog:
+            return .fog
+        case .thunderstorm:
+            return .thunderstorm
+        }
+    }
+}

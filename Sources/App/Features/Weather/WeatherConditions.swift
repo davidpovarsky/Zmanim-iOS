@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUISky
 
 public enum WeatherCondition: String, Sendable, CaseIterable {
     case clearDay = "בהיר"
@@ -13,25 +12,6 @@ public enum WeatherCondition: String, Sendable, CaseIterable {
     case snow = "שלג"
     case fog = "ערפל"
     case thunderstorm = "סופת רעמים"
-
-    public var skyCondition: SkyWeatherCondition {
-        switch self {
-        case .clearDay, .clearNight, .sunrise, .sunset:
-            return .clear
-        case .partlyCloudyDay:
-            return .partlyCloudy
-        case .overcastDay, .cloudyNight:
-            return .overcast
-        case .rain:
-            return .rain
-        case .snow:
-            return .snow
-        case .fog:
-            return .fog
-        case .thunderstorm:
-            return .thunderstorm
-        }
-    }
 
     public static func resolve(
         wmoCode: Int,

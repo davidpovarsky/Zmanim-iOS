@@ -4,20 +4,20 @@ import Foundation
 import WidgetKit
 
 @MainActor
-public final class AppModel: ObservableObject {
-    @Published public var cityName = "מאתר מיקום…"
-    @Published public var timeZone = TimeZone.current
-    @Published public var todayItems: [ZmanItem] = []
-    @Published public var allItems: [ZmanItem] = []
-    @Published public var settings = AppGroupStore.loadSettings()
-    @Published public var isLoading = false
-    @Published public var errorMessage: String?
-    @Published public var weatherModel = WeatherSceneModel()
+final class AppModel: ObservableObject {
+    @Published var cityName = "מאתר מיקום…"
+    @Published var timeZone = TimeZone.current
+    @Published var todayItems: [ZmanItem] = []
+    @Published var allItems: [ZmanItem] = []
+    @Published var settings = AppGroupStore.loadSettings()
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    @Published var weatherModel = WeatherSceneModel()
 
-    public let locationService = LocationService()
+    let locationService = LocationService()
     private var currentLocation: CLLocation?
 
-    public init() {
+    init() {
         NotificationCoordinator.shared.install()
         locationService.onLocation = { [weak self] location in
             Task { @MainActor in

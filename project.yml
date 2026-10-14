@@ -35,6 +35,7 @@ targets:
         NSSupportsLiveActivities: true
     dependencies:
       - package: SwiftUISky
+        product: SwiftUISky
       - target: ZmanimWidgets
         embed: true
       - target: ZmanimNotificationContent
@@ -91,7 +92,6 @@ targets:
       - Tests/ZmanimTests
     dependencies:
       - target: Zmanim
-      - package: SwiftUISky
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.Tests

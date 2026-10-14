@@ -2,20 +2,19 @@ import Combine
 import CoreLocation
 import Foundation
 import SwiftUI
-import SwiftUISky
 
 @MainActor
-public final class WeatherSceneModel: ObservableObject {
-    @Published public var condition: WeatherCondition = .clearDay
-    @Published public var cloudCover: Double = 0.20
-    @Published public var isDay: Bool = true
-    @Published public var lastUpdated: Date?
-    @Published public var previewOverride: WeatherScenePreview?
+final class WeatherSceneModel: ObservableObject {
+    @Published var condition: WeatherCondition = .clearDay
+    @Published var cloudCover: Double = 0.20
+    @Published var isDay: Bool = true
+    @Published var lastUpdated: Date?
+    @Published var previewOverride: WeatherScenePreview?
 
     private var currentLocation: CLLocationCoordinate2D?
     private var lastFetchTime: Date?
 
-    public init() {}
+    init() {}
 
     public func update(
         location: CLLocationCoordinate2D,
