@@ -3,7 +3,7 @@ import UIKit
 import UserNotifications
 import UserNotificationsUI
 
-final class NotificationViewController: UIViewController, UNNotificationContentExtension {
+public final class NotificationViewController: UIViewController, UNNotificationContentExtension {
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim.NotificationContent", category: "NotificationViewController")
 
     private let card = UIView()
@@ -24,7 +24,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     private let sentinelBanner = UILabel()
     #endif
 
-    override func viewDidLoad() {
+    public override func viewDidLoad() {
         super.viewDidLoad()
 
         #if DEBUG
@@ -143,7 +143,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         NSLayoutConstraint.activate(constraints)
     }
 
-    override func viewDidLayoutSubviews() {
+    public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         guard horizonView.bounds.width > 0, horizonView.bounds.height > 0 else { return }
 
@@ -168,7 +168,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         sunView.center = CGPoint(x: sunX, y: sunY)
     }
 
-    func didReceive(_ notification: UNNotification) {
+    public func didReceive(_ notification: UNNotification) {
         let content = notification.request.content
 
         #if DEBUG
@@ -226,7 +226,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         }
     }
 
-    func didReceive(
+    public func didReceive(
         _ response: UNNotificationResponse,
         completionHandler completion: @escaping (UNNotificationContentExtensionResponseOption) -> Void
     ) {

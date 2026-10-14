@@ -69,10 +69,14 @@ targets:
       - Sources/Shared/SolarArcGeometry.swift
     resources:
       - Sources/NotificationContent/MainInterface.storyboard
+    dependencies:
+      - sdk: UserNotifications.framework
+      - sdk: UserNotificationsUI.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.NotificationContent
         APPLICATION_EXTENSION_API_ONLY: YES
+        OTHER_LDFLAGS: ["$(inherited)", "-framework", "UserNotificationsUI", "-framework", "UserNotifications"]
     info:
       path: Supporting/ZmanimNotificationContent-Info.plist
       properties:
