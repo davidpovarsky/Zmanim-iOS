@@ -40,8 +40,8 @@ xcrun simctl location "$DEVICE_ID" set 31.778,35.235
 
 # 3. Grant privacy permissions
 echo "Granting permissions..."
+xcrun simctl privacy "$DEVICE_ID" grant all com.davidpovarsky.Zmanim || true
 xcrun simctl privacy "$DEVICE_ID" grant location com.davidpovarsky.Zmanim || true
-xcrun simctl privacy "$DEVICE_ID" grant notifications com.davidpovarsky.Zmanim || true
 
 # 4. Install fresh app build
 echo "Installing $APP_PATH..."

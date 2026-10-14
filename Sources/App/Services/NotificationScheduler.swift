@@ -90,7 +90,7 @@ enum NotificationScheduler {
         try? await UNUserNotificationCenter.current().add(UNNotificationRequest(
             identifier: "zmanim.test.\(UUID().uuidString)",
             content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         ))
     }
 
@@ -117,12 +117,13 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
         #if DEBUG
         Self.logger.notice("NotificationCoordinator willPresent notification: \(notification.request.identifier, privacy: .public)")
         #endif
-        return [.banner, .sound]
+        completionHandler([.banner, .list, .sound, .badge])
     }
 
     func userNotificationCenter(

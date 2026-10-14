@@ -18,6 +18,35 @@ final class AppModel: ObservableObject {
     private var currentLocation: CLLocation?
 
     init() {
+        if let snapshot = AppGroupStore.loadSnapshot(), !snapshot.items.isEmpty {
+            cityName = snapshot.cityName
+            timeZone = TimeZone(identifier: snapshot.timeZoneID) ?? .current
+            allItems = snapshot.items
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = timeZone
+            todayItems = snapshot.items.filter { cal.isDate($0.date, inSameDayAs: Date()) }
+        }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-UITestMode") {
+            cityName = "ירושלים"
+            timeZone = TimeZone(identifier: "Asia/Jerusalem") ?? .current
+            if todayItems.isEmpty {
+                let now = Date()
+                let cal = Calendar(identifier: .gregorian)
+                let startOfDay = cal.startOfDay(for: now)
+                let mockItems = [
+                    ZmanItem(key: "sunrise", hebrewTitle: "זריחה", englishTitle: "Sunrise", icon: "sunrise.fill", date: startOfDay.addingTimeInterval(6 * 3600)),
+                    ZmanItem(key: "sofZmanShma", hebrewTitle: "סוף זמן ק״ש", englishTitle: "Sof Zman Shma", icon: "sun.max", date: startOfDay.addingTimeInterval(9 * 3600)),
+                    ZmanItem(key: "chatzot", hebrewTitle: "חצות היום", englishTitle: "Midday", icon: "sun.max.fill", date: startOfDay.addingTimeInterval(12.5 * 3600)),
+                    ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: startOfDay.addingTimeInterval(18.5 * 3600)),
+                    ZmanItem(key: "tzeit7083deg", hebrewTitle: "צאת הכוכבים", englishTitle: "Nightfall", icon: "moon.stars.fill", date: startOfDay.addingTimeInterval(19.2 * 3600))
+                ]
+                todayItems = mockItems
+                allItems = mockItems
+            }
+        }
+        #endif
+
         NotificationCoordinator.shared.install()
         locationService.onLocation = { [weak self] location in
             Task { @MainActor in
@@ -29,6 +58,11 @@ final class AppModel: ObservableObject {
     public func start() {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestMode") {
+            if !todayItems.isEmpty {
+                cityName = "ירושלים"
+                timeZone = TimeZone(identifier: "Asia/Jerusalem") ?? .current
+                return
+            }
             let jerusalem = CLLocation(latitude: 31.778, longitude: 35.235)
             Task {
                 await load(
