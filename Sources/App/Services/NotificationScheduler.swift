@@ -2,12 +2,12 @@ import Foundation
 import UserNotifications
 import os
 
-public enum NotificationScheduler {
-    public static let categoryID = NotificationSchedulerConstants.categoryID
-    public static let snoozeActionID = NotificationSchedulerConstants.snoozeActionID
-    public static let openActionID = NotificationSchedulerConstants.openActionID
+enum NotificationScheduler {
+    static let categoryID = NotificationSchedulerConstants.categoryID
+    static let snoozeActionID = NotificationSchedulerConstants.snoozeActionID
+    static let openActionID = NotificationSchedulerConstants.openActionID
 
-    public static func configureCategories() {
+    static func configureCategories() {
         let snooze = UNNotificationAction(
             identifier: snoozeActionID,
             title: "נודניק 5 דק׳",
@@ -27,17 +27,17 @@ public enum NotificationScheduler {
         UNUserNotificationCenter.current().setNotificationCategories([category])
     }
 
-    public static func requestAuthorization() async throws -> Bool {
+    static func requestAuthorization() async throws -> Bool {
         try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
     }
 
-    public static func rescheduleIfAuthorized(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
+    static func rescheduleIfAuthorized(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
         let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         guard status == .authorized || status == .provisional else { return }
         await schedule(settings: settings, items: items, timeZone: timeZone)
     }
 
-    public static func schedule(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
+    static func schedule(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         // Only remove ordinary daily scheduled notifications. Do NOT remove active snoozes or tests.
@@ -76,7 +76,7 @@ public enum NotificationScheduler {
         }
     }
 
-    public static func sendTestNotification() async {
+    static func sendTestNotification() async {
         let content = UNMutableNotificationContent()
         content.title = "שקיעה בעוד 15 דקות"
         content.body = "שקיעה היום בשעה 18:21"
@@ -103,11 +103,11 @@ public enum NotificationScheduler {
     }
 }
 
-public final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
-    public static let shared = NotificationCoordinator()
+final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationCoordinator()
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim", category: "NotificationCoordinator")
 
-    public func install() {
+    func install() {
         UNUserNotificationCenter.current().delegate = self
         NotificationScheduler.configureCategories()
         #if DEBUG
@@ -115,7 +115,7 @@ public final class NotificationCoordinator: NSObject, UNUserNotificationCenterDe
         #endif
     }
 
-    public func userNotificationCenter(
+    func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
@@ -125,7 +125,7 @@ public final class NotificationCoordinator: NSObject, UNUserNotificationCenterDe
         return [.banner, .sound]
     }
 
-    public func userNotificationCenter(
+    func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
