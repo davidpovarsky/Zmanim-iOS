@@ -167,31 +167,47 @@ struct SolarMini: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                Path { path in
-                    path.move(to: CGPoint(x: geometry.size.width - 8, y: geometry.size.height - 8))
-                    path.addQuadCurve(
-                        to: CGPoint(x: 8, y: geometry.size.height - 8),
-                        control: CGPoint(x: geometry.size.width / 2, y: -geometry.size.height / 2)
-                    )
-                }
-                .stroke(.secondary.opacity(0.25), lineWidth: 2)
+            let arc = SolarArcGeometry(
+                size: geometry.size,
+                margin: 10,
+                base: geometry.size.height - 12,
+                arcHeight: geometry.size.height - 24
+            )
+            let p = progress
 
+            ZStack {
+                arc.fullPath()
+                    .stroke(Color.secondary.opacity(0.25), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+
+                if p > 0 {
+                    arc.completedPath(progress: p)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.yellow, Color.orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                }
+
+                let sunPoint = arc.point(at: p)
                 Circle()
-                    .fill(.orange)
-                    .frame(width: 18, height: 18)
-                    .position(
-                        x: geometry.size.width * (1 - CGFloat(progress)),
-                        y: max(10, geometry.size.height - 8 - sin(.pi * progress) * (geometry.size.height - 20))
+                    .fill(Color.orange)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
                     )
+                    .shadow(color: Color.orange.opacity(0.35), radius: 4)
+                    .position(sunPoint)
             }
         }
     }
 
     private var progress: Double {
         guard let sunrise = snapshot?.items.first(where: { $0.key == "sunrise" })?.date,
-              let sunset = snapshot?.items.first(where: { $0.key == "sunset" })?.date,
-              sunset > sunrise else { return 0 }
-        return min(max(now.timeIntervalSince(sunrise) / sunset.timeIntervalSince(sunrise), 0), 1)
+              let sunset = snapshot?.items.first(where: { $0.key == "sunset" })?.date else { return 0 }
+        return SolarArcGeometry.progress(now: now, sunrise: sunrise, sunset: sunset)
     }
 }

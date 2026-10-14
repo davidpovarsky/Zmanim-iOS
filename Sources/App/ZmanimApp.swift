@@ -5,6 +5,10 @@ import WidgetKit
 struct ZmanimApp: App {
     @StateObject private var model = AppModel()
 
+    init() {
+        NotificationCoordinator.shared.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             #if DEBUG
@@ -19,7 +23,17 @@ struct ZmanimApp: App {
                     .environmentObject(model)
                     .environment(\.layoutDirection, .rightToLeft)
                     .preferredColorScheme(.light)
-                    .task { model.start() }
+                    .task {
+                        if let previewArg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("-WeatherPreview:") }) {
+                            let key = String(previewArg.dropFirst("-WeatherPreview:".count))
+                            if let preset = WeatherScenePreview.allCases.first(where: {
+                                $0.rawValue == key || "\($0)".lowercased() == key.lowercased()
+                            }) {
+                                model.weatherModel.setPreview(preset)
+                            }
+                        }
+                        model.start()
+                    }
             }
             #else
             RootView()

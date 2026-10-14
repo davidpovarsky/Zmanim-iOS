@@ -1,32 +1,55 @@
 import SwiftUI
+import SwiftUISky
 
-struct HomeView: View {
+public struct HomeView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 30)) { timeline in
+                let effectiveDate = effectiveDate(for: timeline.date)
+                let sunrise = model.todayItems.first { $0.key == "sunrise" }?.date
+                let sunset = model.todayItems.first { $0.key == "sunset" }?.date
+
                 ScrollView {
-                    VStack(spacing: 22) {
-                        header
+                    VStack(spacing: 20) {
+                        header(for: effectiveDate, sunrise: sunrise, sunset: sunset)
                         SolarHero(
-                            now: timeline.date,
+                            now: effectiveDate,
                             items: model.todayItems,
                             city: model.cityName,
                             timeZone: model.timeZone
                         )
-                        nextCard(now: timeline.date)
-                        zmanList(now: timeline.date)
+                        nextCard(now: effectiveDate)
+                        zmanList(now: effectiveDate)
 
-                        Text("נתוני הזמנים באדיבות Hebcal.com")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .padding(.bottom, 24)
+                        VStack(spacing: 4) {
+                            Text("נתוני הזמנים באדיבות Hebcal.com")
+                            Text("נתוני מזג אוויר באדיבות Open-Meteo.com")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 24)
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 12)
                 }
-                .background(Color.zmanBackground.ignoresSafeArea())
+                .background {
+                    ZStack(alignment: .top) {
+                        Color.zmanBackground.ignoresSafeArea()
+                        ZmanimSkyBackdrop(
+                            date: effectiveDate,
+                            sunrise: sunrise,
+                            sunset: sunset,
+                            condition: model.weatherModel.condition,
+                            cloudCover: model.weatherModel.cloudCover,
+                            isPaused: model.weatherModel.previewOverride != nil
+                        )
+                    }
+                }
             }
             .navigationTitle("זמנים")
             .navigationBarTitleDisplayMode(.inline)
@@ -38,36 +61,70 @@ struct HomeView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
+
+                #if DEBUG
+                ToolbarItem(placement: .topBarTrailing) {
+                    weatherPreviewMenu
+                }
+                #endif
             }
         }
     }
 
-    private var header: some View {
-        HStack {
+    private func effectiveDate(for date: Date) -> Date {
+        #if DEBUG
+        if let preview = model.weatherModel.previewOverride {
+            let rise = model.todayItems.first { $0.key == "sunrise" }?.date
+            let set = model.todayItems.first { $0.key == "sunset" }?.date
+            return preview.simulatedDate(for: date, sunrise: rise, sunset: set)
+        }
+        #endif
+        return date
+    }
+
+    private func header(for date: Date, sunrise: Date?, sunset: Date?) -> some View {
+        let textColor = ZmanimSkyBackdrop.headerColor(
+            for: date,
+            sunrise: sunrise,
+            sunset: sunset,
+            condition: model.weatherModel.condition,
+            cloudCover: model.weatherModel.cloudCover,
+            colorScheme: colorScheme
+        )
+
+        return HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text(Date.now.formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "he_IL"))))
+                Text(date.formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "he_IL"))))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(hebrewDate)
+                    .foregroundStyle(textColor.opacity(0.85))
+                Text(hebrewDate(for: date))
                     .font(.title3.bold())
+                    .foregroundStyle(textColor)
             }
             Spacer()
             if model.isLoading {
-                ProgressView()
+                ProgressView().tint(textColor)
             } else {
-                Label(model.cityName, systemImage: "location.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Label(model.cityName, systemImage: "location.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(textColor.opacity(0.85))
+                    Text("·")
+                        .foregroundStyle(textColor.opacity(0.60))
+                    Text(model.weatherModel.condition.rawValue)
+                        .font(.caption.bold())
+                        .foregroundStyle(textColor.opacity(0.85))
+                }
             }
         }
     }
 
-    private var hebrewDate: String {
+    private func hebrewDate(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .hebrew)
         formatter.locale = Locale(identifier: "he_IL")
         formatter.dateStyle = .long
-        return formatter.string(from: .now)
+        return formatter.string(from: date)
     }
 
     @ViewBuilder
@@ -134,6 +191,24 @@ struct HomeView: View {
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
+
+    #if DEBUG
+    private var weatherPreviewMenu: some View {
+        Menu {
+            Button("מזג אוויר חי (ברירת מחדל)") {
+                model.weatherModel.setPreview(nil)
+            }
+            Divider()
+            ForEach(WeatherScenePreview.allCases) { preview in
+                Button(preview.rawValue) {
+                    model.weatherModel.setPreview(preview)
+                }
+            }
+        } label: {
+            Image(systemName: "cloud.sun.fill")
+        }
+    }
+    #endif
 }
 
 private struct SolarHero: View {
@@ -144,36 +219,41 @@ private struct SolarHero: View {
 
     private var sunrise: Date? { items.first { $0.key == "sunrise" }?.date }
     private var sunset: Date? { items.first { $0.key == "sunset" }?.date }
-    private var progress: Double { SolarMath.progress(now: now, sunrise: sunrise, sunset: sunset) }
+    private var progress: Double { SolarArcGeometry.progress(now: now, sunrise: sunrise, sunset: sunset) }
 
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
+                let arc = SolarArcGeometry(size: geometry.size)
+                let p = progress
+
                 ZStack {
-                    HorizonArcShape()
-                        .stroke(Color.zmanInk.opacity(0.12), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    HorizonArcShape()
-                        .trim(from: 0, to: progress)
-                        .stroke(
-                            LinearGradient(colors: [Color.yellow, Color.zmanOrange], startPoint: .trailing, endPoint: .leading),
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                        )
+                    arc.fullPath()
+                        .stroke(Color.zmanInk.opacity(0.14), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+
+                    if p > 0 {
+                        arc.completedPath(progress: p)
+                            .stroke(
+                                LinearGradient(colors: [Color.yellow, Color.zmanOrange], startPoint: .leading, endPoint: .trailing),
+                                style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                            )
+                    }
 
                     if let sunrise {
                         label("זריחה", sunrise)
-                            .position(x: geometry.size.width - 50, y: geometry.size.height - 12)
+                            .position(x: arc.startPoint.x + 24, y: arc.base + 16)
                     }
                     if let sunset {
                         label("שקיעה", sunset)
-                            .position(x: 50, y: geometry.size.height - 12)
+                            .position(x: arc.endPoint.x - 24, y: arc.base + 16)
                     }
                     if let sunrise, let sunset, now >= sunrise, now <= sunset {
                         Circle()
                             .fill(Color.zmanOrange)
                             .frame(width: 30, height: 30)
                             .overlay(Image(systemName: "sun.max.fill").font(.caption).foregroundStyle(.white))
-                            .shadow(color: .orange.opacity(0.25), radius: 12)
-                            .position(SolarMath.point(progress: progress, size: geometry.size))
+                            .shadow(color: .orange.opacity(0.3), radius: 8)
+                            .position(arc.point(at: p))
                     }
                 }
             }

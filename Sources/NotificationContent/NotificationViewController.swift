@@ -3,7 +3,6 @@ import UIKit
 import UserNotifications
 import UserNotificationsUI
 
-@objc(NotificationViewController)
 final class NotificationViewController: UIViewController, UNNotificationContentExtension {
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim.NotificationContent", category: "NotificationViewController")
 
@@ -13,10 +12,13 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     private let titleLabel = UILabel()
     private let timeLabel = UILabel()
     private let countdownLabel = UILabel()
+    private let horizonView = UIView()
     private let arcLayer = CAShapeLayer()
     private let sunView = UIImageView(image: UIImage(systemName: "sun.max.fill"))
+
     private var targetDate: Date?
     private var countdownTimer: Timer?
+    private var currentProgress: Double = 0.75
 
     #if DEBUG
     private let sentinelBanner = UILabel()
@@ -29,15 +31,14 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD")
         #endif
 
-        preferredContentSize = CGSize(width: 390, height: 235)
+        preferredContentSize = CGSize(width: 390, height: 240)
         view.semanticContentAttribute = .forceRightToLeft
         view.backgroundColor = UIColor(red: 0.972, green: 0.966, blue: 0.936, alpha: 1)
 
         #if DEBUG
-        // Visually unmistakable background and sentinel banner in DEBUG
         sentinelBanner.translatesAutoresizingMaskIntoConstraints = false
         sentinelBanner.text = "ZMANIM CONTENT EXTENSION LOADED"
-        sentinelBanner.font = .systemFont(ofSize: 13, weight: .heavy)
+        sentinelBanner.font = .systemFont(ofSize: 12, weight: .heavy)
         sentinelBanner.textColor = .white
         sentinelBanner.backgroundColor = .systemIndigo
         sentinelBanner.textAlignment = .center
@@ -47,9 +48,11 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         #endif
 
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.backgroundColor = UIColor(red: 0.965, green: 0.945, blue: 0.885, alpha: 0.72)
-        card.layer.cornerRadius = 24
+        card.backgroundColor = UIColor(red: 0.965, green: 0.945, blue: 0.885, alpha: 0.85)
+        card.layer.cornerRadius = 22
         card.layer.cornerCurve = .continuous
+        card.layer.borderWidth = 1
+        card.layer.borderColor = UIColor(red: 0.105, green: 0.105, blue: 0.20, alpha: 0.10).cgColor
         view.addSubview(card)
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
@@ -63,7 +66,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         eyebrowLabel.text = "תזכורת זמן"
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .preferredFont(forTextStyle: .title2)
+        titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textAlignment = .right
         titleLabel.numberOfLines = 1
@@ -74,7 +77,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
 
         countdownLabel.translatesAutoresizingMaskIntoConstraints = false
         countdownLabel.font = .preferredFont(forTextStyle: .subheadline)
-        countdownLabel.textColor = .secondaryLabel
+        countdownLabel.textColor = UIColor.systemOrange
         countdownLabel.textAlignment = .right
 
         let textStack = UIStackView(arrangedSubviews: [eyebrowLabel, titleLabel, timeLabel, countdownLabel])
@@ -86,50 +89,53 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         header.translatesAutoresizingMaskIntoConstraints = false
         header.axis = .horizontal
         header.alignment = .top
-        header.spacing = 12
+        header.spacing = 14
         header.semanticContentAttribute = .forceRightToLeft
         card.addSubview(header)
 
-        let horizon = UIView()
-        horizon.translatesAutoresizingMaskIntoConstraints = false
-        horizon.backgroundColor = .clear
-        card.addSubview(horizon)
+        horizonView.translatesAutoresizingMaskIntoConstraints = false
+        horizonView.backgroundColor = .clear
+        card.addSubview(horizonView)
 
         arcLayer.fillColor = UIColor.clear.cgColor
-        arcLayer.strokeColor = UIColor.systemOrange.withAlphaComponent(0.34).cgColor
-        arcLayer.lineWidth = 2
+        arcLayer.strokeColor = UIColor.systemOrange.withAlphaComponent(0.40).cgColor
+        arcLayer.lineWidth = 2.5
         arcLayer.lineCap = .round
-        horizon.layer.addSublayer(arcLayer)
+        horizonView.layer.addSublayer(arcLayer)
 
         sunView.translatesAutoresizingMaskIntoConstraints = false
         sunView.tintColor = .systemOrange
-        horizon.addSubview(sunView)
+        sunView.contentMode = .scaleAspectFit
+        horizonView.addSubview(sunView)
 
         var constraints = [
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
             card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
             card.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
             card.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
+
             header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
             header.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
-            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
-            iconView.widthAnchor.constraint(equalToConstant: 42),
-            iconView.heightAnchor.constraint(equalToConstant: 42),
-            horizon.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
-            horizon.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
-            horizon.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
-            horizon.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
-            sunView.widthAnchor.constraint(equalToConstant: 22),
-            sunView.heightAnchor.constraint(equalToConstant: 22),
-            sunView.trailingAnchor.constraint(equalTo: horizon.trailingAnchor, constant: -6),
-            sunView.bottomAnchor.constraint(equalTo: horizon.bottomAnchor, constant: -2)
+            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+
+            iconView.widthAnchor.constraint(equalToConstant: 40),
+            iconView.heightAnchor.constraint(equalToConstant: 40),
+
+            horizonView.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            horizonView.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            horizonView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 6),
+            horizonView.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10),
+            horizonView.heightAnchor.constraint(equalToConstant: 36),
+
+            sunView.widthAnchor.constraint(equalToConstant: 18),
+            sunView.heightAnchor.constraint(equalToConstant: 18)
         ]
 
         #if DEBUG
         constraints.append(contentsOf: [
             sentinelBanner.topAnchor.constraint(equalTo: view.topAnchor, constant: 2),
-            sentinelBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            sentinelBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            sentinelBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+            sentinelBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
             sentinelBanner.heightAnchor.constraint(equalToConstant: 18)
         ])
         #endif
@@ -139,13 +145,27 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        guard let horizon = sunView.superview else { return }
-        let rect = horizon.bounds.insetBy(dx: 8, dy: 4)
+        guard horizonView.bounds.width > 0, horizonView.bounds.height > 0 else { return }
+
+        let bounds = horizonView.bounds
+        let margin: CGFloat = 12
+        let base = bounds.height - 4
+        let arcHeight = bounds.height - 10
+        let p0 = CGPoint(x: margin, y: base)
+        let p2 = CGPoint(x: bounds.width - margin, y: base)
+        let p1 = CGPoint(x: bounds.width / 2, y: base - 2 * arcHeight)
+
         let path = UIBezierPath()
-        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY), controlPoint: CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.25))
+        path.move(to: p0)
+        path.addQuadCurve(to: p2, controlPoint: p1)
         arcLayer.path = path.cgPath
-        arcLayer.frame = horizon.bounds
+        arcLayer.frame = bounds
+
+        let t = CGFloat(currentProgress)
+        let u = 1 - t
+        let sunX = u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x
+        let sunY = u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y
+        sunView.center = CGPoint(x: sunX, y: sunY)
     }
 
     func didReceive(_ notification: UNNotification) {
@@ -156,8 +176,11 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE category=\(content.categoryIdentifier, privacy: .public) title=\(content.title, privacy: .public) userInfoKeys=[\(keys, privacy: .public)]")
         #endif
 
-        titleLabel.text = content.userInfo["zmanTitle"] as? String ?? content.title
-        iconView.image = UIImage(systemName: content.userInfo["zmanIcon"] as? String ?? "sunset.fill")
+        let title = content.userInfo["zmanTitle"] as? String ?? content.title
+        titleLabel.text = title.isEmpty ? "תזכורת זמן" : title
+
+        let iconName = content.userInfo["zmanIcon"] as? String ?? "sun.max.fill"
+        iconView.image = UIImage(systemName: iconName) ?? UIImage(systemName: "sun.max.fill")
 
         if let seconds = content.userInfo["zmanTime"] as? Double {
             let target = Date(timeIntervalSince1970: seconds)
@@ -172,15 +195,35 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
                 self?.updateCountdown()
             }
         } else {
-            timeLabel.text = content.body
+            timeLabel.text = content.body.isEmpty ? "--:--" : content.body
             countdownLabel.text = ""
         }
+
+        if let progressVal = content.userInfo["zmanProgress"] as? Double {
+            currentProgress = max(0, min(1, progressVal))
+        } else if title.contains("שקיעה") {
+            currentProgress = 0.90
+        } else if title.contains("זריחה") {
+            currentProgress = 0.10
+        } else if title.contains("חצות") {
+            currentProgress = 0.50
+        } else {
+            currentProgress = 0.75
+        }
+
+        view.setNeedsLayout()
     }
 
     private func updateCountdown() {
         guard let targetDate else { return }
-        let minutes = max(0, Int(ceil(targetDate.timeIntervalSinceNow / 60)))
-        countdownLabel.text = minutes > 0 ? "בעוד \(minutes) דקות" : "הזמן הגיע"
+        let minutes = Int(ceil(targetDate.timeIntervalSinceNow / 60))
+        if minutes > 0 {
+            countdownLabel.text = "בעוד \(minutes) דקות"
+        } else if minutes == 0 {
+            countdownLabel.text = "הזמן הגיע"
+        } else {
+            countdownLabel.text = "לפני \(abs(minutes)) דקות"
+        }
     }
 
     func didReceive(
@@ -191,24 +234,8 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
         Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_ACTION actionIdentifier=\(response.actionIdentifier, privacy: .public)")
         #endif
 
-        switch response.actionIdentifier {
-        case NotificationSchedulerConstants.snoozeActionID:
-            let request = ZmanimSnoozeRequest.make(from: response.notification.request.content)
-            UNUserNotificationCenter.current().add(request) { error in
-                #if DEBUG
-                if let error {
-                    Self.logger.error("Failed to add snooze request: \(error.localizedDescription, privacy: .public)")
-                } else {
-                    Self.logger.notice("Snooze request added successfully: \(request.identifier, privacy: .public)")
-                }
-                #endif
-                completion(.dismiss)
-            }
-        case NotificationSchedulerConstants.openActionID:
-            completion(.dismissAndForwardAction)
-        default:
-            completion(.dismissAndForwardAction)
-        }
+        // Single-owner architecture: forward the action to NotificationCoordinator in the containing app
+        completion(.dismissAndForwardAction)
     }
 
     deinit {

@@ -1,3 +1,31 @@
 import SwiftUI
-struct HorizonArcShape:Shape {func path(in rect:CGRect)->Path{var p=Path();let margin:CGFloat=22,base=rect.height-40;p.move(to:.init(x:rect.width-margin,y:base));p.addQuadCurve(to:.init(x:margin,y:base),control:.init(x:rect.midX,y:-rect.height*0.42));return p}}
-enum SolarMath {static func progress(now:Date,sunrise:Date?,sunset:Date?)->Double{guard let sunrise,let sunset,sunset>sunrise else{return 0};return min(max(now.timeIntervalSince(sunrise)/sunset.timeIntervalSince(sunrise),0),1)};static func point(progress:Double,size:CGSize)->CGPoint{let t=CGFloat(progress),u=1-t,m:CGFloat=22,b=size.height-40;let s=CGPoint(x:size.width-m,y:b),e=CGPoint(x:m,y:b),c=CGPoint(x:size.width/2,y:-size.height*0.42);return .init(x:u*u*s.x+2*u*t*c.x+t*t*e.x,y:u*u*s.y+2*u*t*c.y+t*t*e.y)}}
+
+/// Horizon arc shape adhering to the unified Bézier geometry.
+/// Chronological progression: Sunrise on left -> Sunset on right.
+public struct HorizonArcShape: Shape {
+    public var progress: Double? = nil
+
+    public init(progress: Double? = nil) {
+        self.progress = progress
+    }
+
+    public func path(in rect: CGRect) -> Path {
+        let geometry = SolarArcGeometry(size: rect.size)
+        if let progress {
+            return geometry.completedPath(progress: progress)
+        } else {
+            return geometry.fullPath()
+        }
+    }
+}
+
+public enum SolarMath {
+    public static func progress(now: Date, sunrise: Date?, sunset: Date?) -> Double {
+        SolarArcGeometry.progress(now: now, sunrise: sunrise, sunset: sunset)
+    }
+
+    public static func point(progress: Double, size: CGSize) -> CGPoint {
+        let geometry = SolarArcGeometry(size: size)
+        return geometry.point(at: progress)
+    }
+}

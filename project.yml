@@ -8,7 +8,10 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "4"
+packages:
+  SwiftUISky:
+    path: Packages/SwiftUISky
 targets:
   Zmanim:
     type: application
@@ -31,6 +34,7 @@ targets:
         NSLocationWhenInUseUsageDescription: "המיקום משמש לחישוב זמני היום המדויקים באזור שלך."
         NSSupportsLiveActivities: true
     dependencies:
+      - package: SwiftUISky
       - target: ZmanimWidgets
         embed: true
       - target: ZmanimNotificationContent
@@ -59,10 +63,11 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - Sources/NotificationContent
-      - Sources/Shared/SnoozeRequest.swift
+      - path: Sources/NotificationContent/NotificationViewController.swift
+      - path: Sources/Shared/SnoozeRequest.swift
+      - path: Sources/Shared/SolarArcGeometry.swift
     resources:
-      - Sources/NotificationContent/MainInterface.storyboard
+      - path: Sources/NotificationContent/MainInterface.storyboard
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.NotificationContent
@@ -86,6 +91,7 @@ targets:
       - Tests/ZmanimTests
     dependencies:
       - target: Zmanim
+      - package: SwiftUISky
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.Tests

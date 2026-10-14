@@ -1,35 +1,65 @@
 import Foundation
 import UserNotifications
 
-enum ZmanimSnoozeRequest {
-    static let productionInterval: TimeInterval = 5 * 60
+public enum ZmanimSnoozeRequest {
+    public static let productionInterval: TimeInterval = 5 * 60
 
     #if DEBUG
-    static var interval: TimeInterval {
+    public static var interval: TimeInterval {
         ProcessInfo.processInfo.arguments.contains("-UITestShortSnooze") ? 5 : productionInterval
     }
     #else
-    static var interval: TimeInterval { productionInterval }
+    public static var interval: TimeInterval { productionInterval }
     #endif
 
-    static func make(from original: UNNotificationContent, now: Date = Date(), identifier: String = UUID().uuidString) -> UNNotificationRequest {
+    public static func stableSnoozeIdentifier(from originalIdentifier: String) -> String {
+        let stripped: String
+        if originalIdentifier.hasPrefix("zmanim.snooze.") {
+            stripped = String(originalIdentifier.dropFirst("zmanim.snooze.".count))
+        } else if originalIdentifier.hasPrefix("zmanim.daily.") {
+            stripped = "daily." + String(originalIdentifier.dropFirst("zmanim.daily.".count))
+        } else if originalIdentifier.hasPrefix("zmanim.test.") {
+            stripped = "test." + String(originalIdentifier.dropFirst("zmanim.test.".count))
+        } else if originalIdentifier.hasPrefix("zmanim.") {
+            stripped = String(originalIdentifier.dropFirst("zmanim.".count))
+        } else {
+            stripped = originalIdentifier
+        }
+        return "zmanim.snooze.\(stripped)"
+    }
+
+    public static func make(
+        from original: UNNotificationContent,
+        originalIdentifier: String = UUID().uuidString
+    ) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = original.title
-        content.body = "נודניק · " + original.body
+
+        let cleanBody: String
+        let prefix = "נודניק · "
+        if original.body.hasPrefix(prefix) {
+            cleanBody = String(original.body.dropFirst(prefix.count))
+        } else {
+            cleanBody = original.body
+        }
+        content.body = prefix + cleanBody
         content.sound = .default
         content.categoryIdentifier = NotificationSchedulerConstants.categoryID
         content.userInfo = original.userInfo
 
+        let identifier = stableSnoozeIdentifier(from: originalIdentifier)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, interval), repeats: false)
+
         return UNNotificationRequest(
-            identifier: "zmanim.snooze.\(identifier)",
+            identifier: identifier,
             content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: max(1, interval), repeats: false)
+            trigger: trigger
         )
     }
 }
 
-enum NotificationSchedulerConstants {
-    static let categoryID = "ZMANIM_ALERT"
-    static let snoozeActionID = "ZMANIM_SNOOZE_5"
-    static let openActionID = "ZMANIM_OPEN"
+public enum NotificationSchedulerConstants {
+    public static let categoryID = "ZMANIM_ALERT"
+    public static let snoozeActionID = "ZMANIM_SNOOZE_5"
+    public static let openActionID = "ZMANIM_OPEN"
 }

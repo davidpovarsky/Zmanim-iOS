@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # run-simulator-validation.sh
-# End-to-end runtime verification of Widgets, Rich Notification Content Extension, and Snooze in iOS Simulator.
+# End-to-end runtime verification of Widgets, Rich Notification Content Extension, Snooze, and Weather Scenes.
 
 DEVICE_ID="${1:-${DEVICE_ID:-}}"
 APP_PATH="${2:-${APP_PATH:-build/SimulatorDerivedData/Build/Products/Debug-iphonesimulator/Zmanim.app}}"
@@ -24,6 +24,7 @@ echo "=== Using Simulator Device ID: $DEVICE_ID ==="
 
 mkdir -p diagnostics/widgets
 mkdir -p diagnostics/notifications
+mkdir -p diagnostics/weather
 
 # 1. Boot simulator if not booted
 STATUS="$(xcrun simctl list devices | grep "$DEVICE_ID" | grep -o "(Booted)" || true)"
@@ -37,7 +38,7 @@ xcrun simctl bootstatus "$DEVICE_ID" -b
 echo "Setting simulator location to Jerusalem (31.778, 35.235)..."
 xcrun simctl location "$DEVICE_ID" set 31.778,35.235
 
-# 3. Grant privacy permissions for location and notifications
+# 3. Grant privacy permissions
 echo "Granting permissions..."
 xcrun simctl privacy "$DEVICE_ID" grant location com.davidpovarsky.Zmanim || true
 xcrun simctl privacy "$DEVICE_ID" grant notifications com.davidpovarsky.Zmanim || true
@@ -58,8 +59,13 @@ echo "Notification Content PlugInKit entry: $NC_REG"
 echo "Widgets PlugInKit entry: $WIDGET_REG"
 
 if [ -z "$NC_REG" ]; then
-    echo "Querying specifically for NotificationContent..."
-    xcrun simctl spawn "$DEVICE_ID" pluginkit -m -i com.davidpovarsky.Zmanim.NotificationContent -D || true
+    echo "FAIL: PlugInKit did not register com.davidpovarsky.Zmanim.NotificationContent"
+    exit 1
+fi
+
+if [ -z "$WIDGET_REG" ]; then
+    echo "FAIL: PlugInKit did not register com.davidpovarsky.Zmanim.Widgets"
+    exit 1
 fi
 
 # 6. Seed App Group / shared cache with Jerusalem data
@@ -68,35 +74,50 @@ xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -UITestMode YES
 sleep 4
 xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
 
-# 7. Capture Widget Screenshots across families
-echo "=== Capturing Widget Family Screenshots ==="
-for FAMILY in small medium large extralarge; do
-    echo "Rendering and capturing widget family: $FAMILY..."
-    xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -RenderWidget:$FAMILY -UITestMode YES
-    sleep 2
-    xcrun simctl io "$DEVICE_ID" screenshot "diagnostics/widgets/${FAMILY}.png"
-    xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
-    echo "Saved diagnostics/widgets/${FAMILY}.png"
-done
-
-# Build and exercise specific widget schemes
-echo "=== Building Widget Extension Schemes ==="
-for SCHEME in ZmanimWidgets_Small ZmanimWidgets_Medium ZmanimWidgets_Large ZmanimWidgets_ExtraLarge; do
-    echo "Validating widget scheme: $SCHEME..."
+# 7. Real WidgetKit schemes validation
+echo "=== Validating Real WidgetKit Extension Schemes ==="
+for SCHEME in ZmanimWidgets_Small ZmanimWidgets_Medium ZmanimWidgets_Large; do
+    echo "Building and launching widget scheme: $SCHEME..."
     xcodebuild build \
         -project Zmanim.xcodeproj \
         -scheme "$SCHEME" \
         -destination "id=$DEVICE_ID" \
         -configuration Debug \
         -derivedDataPath build/SimulatorDerivedData \
-        CODE_SIGNING_ALLOWED=NO >/dev/null 2>&1 || true
+        CODE_SIGNING_ALLOWED=NO
 done
 
-# 8. Test Rich Notification Delivery, Expansion, and Snooze Flow
+# Render and capture widget views across families
+for FAMILY in small medium large extralarge; do
+    echo "Capturing widget family: $FAMILY..."
+    xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -RenderWidget:$FAMILY -UITestMode YES
+    sleep 2
+    xcrun simctl io "$DEVICE_ID" screenshot "diagnostics/widgets/${FAMILY}.png"
+    xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
+    test -f "diagnostics/widgets/${FAMILY}.png"
+    echo "Saved diagnostics/widgets/${FAMILY}.png"
+done
+
+# 8. Capture authentic Weather Scene Screenshots
+echo "=== Capturing Dynamic Weather Scene Screenshots ==="
+for SCENE in middaySun goldenSunset clearNight partlyCloudyAfternoon rain snow fog; do
+    echo "Rendering weather scene: $SCENE..."
+    xcrun simctl launch "$DEVICE_ID" com.davidpovarsky.Zmanim -UITestMode YES "-WeatherPreview:$SCENE"
+    sleep 3
+    xcrun simctl io "$DEVICE_ID" screenshot "diagnostics/weather/${SCENE}.png"
+    xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
+    test -f "diagnostics/weather/${SCENE}.png"
+    echo "Saved diagnostics/weather/${SCENE}.png"
+done
+
+# 9. Test Rich Notification Delivery, Expansion, and Snooze Flow
 echo "=== Testing Rich Notification & Snooze Flow ==="
 xcrun simctl terminate "$DEVICE_ID" com.davidpovarsky.Zmanim || true
 
-echo "Running ZmanimUITests for notification & snooze interaction..."
+# Clear temporary capture files
+rm -f /tmp/expanded-rich-notification.png /tmp/snooze-redelivered.png
+
+echo "Running ZmanimUITests with mandatory assertions..."
 set +e
 xcodebuild test \
     -project Zmanim.xcodeproj \
@@ -109,21 +130,40 @@ xcodebuild test \
 UITEST_STATUS=${PIPESTATUS[0]}
 set -e
 
-# Capture screenshot of expanded notification or current screen
+if [ "$UITEST_STATUS" -ne 0 ] || ! grep -q '\*\* TEST SUCCEEDED \*\*' build/uitest.log; then
+    echo "ERROR: ZmanimUITests failed with status $UITEST_STATUS"
+    exit 1
+fi
+echo "ZmanimUITests PASSED successfully!"
+
+# Validate screenshots captured during UI test
 if [ -f "/tmp/expanded-rich-notification.png" ]; then
     cp "/tmp/expanded-rich-notification.png" diagnostics/notifications/expanded-rich-notification.png
-    echo "Saved diagnostics/notifications/expanded-rich-notification.png from UI test screen capture"
+    echo "Saved authentic diagnostics/notifications/expanded-rich-notification.png"
 else
-    xcrun simctl io "$DEVICE_ID" screenshot diagnostics/notifications/expanded-rich-notification.png
-    echo "Saved diagnostics/notifications/expanded-rich-notification.png from simulator screen capture"
+    echo "ERROR: /tmp/expanded-rich-notification.png was not generated by UI test"
+    exit 1
 fi
 
-# Wait 6 seconds for the 5-second snooze notification to fire
-echo "Waiting 6 seconds for 5-second snooze redelivery..."
-sleep 6
-xcrun simctl io "$DEVICE_ID" screenshot diagnostics/notifications/snooze-redelivered.png || true
+if [ -f "/tmp/snooze-redelivered.png" ]; then
+    cp "/tmp/snooze-redelivered.png" diagnostics/notifications/snooze-redelivered.png
+    echo "Saved authentic diagnostics/notifications/snooze-redelivered.png"
+else
+    echo "ERROR: /tmp/snooze-redelivered.png was not generated by UI test"
+    exit 1
+fi
 
-# 9. Collect Runtime Logs for SpringBoard, usernotificationsd, pluginkit, and NotificationContent
+# Verify screenshots are not identical / duplicated
+EXPANDED_HASH="$(shasum -a 256 diagnostics/notifications/expanded-rich-notification.png | awk '{print $1}')"
+REDELIVERED_HASH="$(shasum -a 256 diagnostics/notifications/snooze-redelivered.png | awk '{print $1}')"
+
+if [ "$EXPANDED_HASH" = "$REDELIVERED_HASH" ]; then
+    echo "ERROR: expanded-rich-notification.png and snooze-redelivered.png have identical hash ($EXPANDED_HASH)! Must be independent captures."
+    exit 1
+fi
+echo "Confirmed distinct authentic screenshots: expanded=$EXPANDED_HASH, redelivered=$REDELIVERED_HASH"
+
+# 10. Collect and analyze runtime logs
 echo "=== Collecting Runtime Logs ==="
 xcrun simctl spawn "$DEVICE_ID" log show --style compact \
     --predicate 'process CONTAINS[c] "SpringBoard" OR process CONTAINS[c] "usernotificationsd" OR process CONTAINS[c] "pluginkit" OR process CONTAINS[c] "Zmanim" OR subsystem CONTAINS[c] "com.davidpovarsky.Zmanim"' \
@@ -131,19 +171,24 @@ xcrun simctl spawn "$DEVICE_ID" log show --style compact \
 
 echo "Saved diagnostics/notifications/notification-runtime.log (size: $(wc -c < diagnostics/notifications/notification-runtime.log) bytes)"
 
-# Check for sentinel diagnostic strings in the log
 echo "=== Diagnostic Log Analysis ==="
-if grep -q "ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD" diagnostics/notifications/notification-runtime.log; then
-    echo "CONFIRMED: ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD found in runtime logs!"
-else
-    echo "NOTE: ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD log entry check."
+if ! grep -q "ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD" diagnostics/notifications/notification-runtime.log; then
+    echo "ERROR: Expected ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD not found in runtime logs!"
+    exit 1
 fi
+echo "CONFIRMED: ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD found in runtime logs!"
 
-if grep -q "ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE" diagnostics/notifications/notification-runtime.log; then
-    echo "CONFIRMED: ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE found in runtime logs!"
-else
-    echo "NOTE: ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE log entry check."
+if ! grep -q "ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE" diagnostics/notifications/notification-runtime.log; then
+    echo "ERROR: Expected ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE not found in runtime logs!"
+    exit 1
 fi
+echo "CONFIRMED: ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE found in runtime logs!"
 
-echo "=== Simulator Validation Finished Successfully ==="
+if ! grep -q "NotificationCoordinator scheduled snooze:" diagnostics/notifications/notification-runtime.log; then
+    echo "ERROR: Expected NotificationCoordinator scheduled snooze log not found!"
+    exit 1
+fi
+echo "CONFIRMED: NotificationCoordinator successfully scheduled snooze!"
+
+echo "=== All Simulator Validation Steps Completed Successfully! ==="
 exit 0

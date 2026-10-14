@@ -2,12 +2,12 @@ import Foundation
 import UserNotifications
 import os
 
-enum NotificationScheduler {
-    static let categoryID = NotificationSchedulerConstants.categoryID
-    static let snoozeActionID = NotificationSchedulerConstants.snoozeActionID
-    static let openActionID = NotificationSchedulerConstants.openActionID
+public enum NotificationScheduler {
+    public static let categoryID = NotificationSchedulerConstants.categoryID
+    public static let snoozeActionID = NotificationSchedulerConstants.snoozeActionID
+    public static let openActionID = NotificationSchedulerConstants.openActionID
 
-    static func configureCategories() {
+    public static func configureCategories() {
         let snooze = UNNotificationAction(
             identifier: snoozeActionID,
             title: "נודניק 5 דק׳",
@@ -27,20 +27,22 @@ enum NotificationScheduler {
         UNUserNotificationCenter.current().setNotificationCategories([category])
     }
 
-    static func requestAuthorization() async throws -> Bool {
+    public static func requestAuthorization() async throws -> Bool {
         try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
     }
 
-    static func rescheduleIfAuthorized(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
+    public static func rescheduleIfAuthorized(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
         let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         guard status == .authorized || status == .provisional else { return }
         await schedule(settings: settings, items: items, timeZone: timeZone)
     }
 
-    static func schedule(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
+    public static func schedule(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
-        center.removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter { $0.hasPrefix("zmanim.") })
+        // Only remove ordinary daily scheduled notifications. Do NOT remove active snoozes or tests.
+        let toRemove = pending.map(\.identifier).filter { $0.hasPrefix("zmanim.daily.") }
+        center.removePendingNotificationRequests(withIdentifiers: toRemove)
 
         var candidates: [(Date, NotificationRule, ZmanItem)] = []
         for rule in settings.rules where rule.isEnabled {
@@ -67,14 +69,14 @@ enum NotificationScheduler {
             ]
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, fire.timeIntervalSinceNow), repeats: false)
             try? await center.add(UNNotificationRequest(
-                identifier: "zmanim.\(index).\(Int(fire.timeIntervalSince1970))",
+                identifier: "zmanim.daily.\(index).\(Int(fire.timeIntervalSince1970))",
                 content: content,
                 trigger: trigger
             ))
         }
     }
 
-    static func sendTestNotification() async {
+    public static func sendTestNotification() async {
         let content = UNMutableNotificationContent()
         content.title = "שקיעה בעוד 15 דקות"
         content.body = "שקיעה היום בשעה 18:21"
@@ -101,43 +103,62 @@ enum NotificationScheduler {
     }
 }
 
-final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = NotificationCoordinator()
+public final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
+    public static let shared = NotificationCoordinator()
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim", category: "NotificationCoordinator")
 
-    func install() {
+    public func install() {
         UNUserNotificationCenter.current().delegate = self
         NotificationScheduler.configureCategories()
+        #if DEBUG
+        Self.logger.notice("NotificationCoordinator installed delegate and configured categories")
+        #endif
     }
 
-    func userNotificationCenter(
+    public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        #if DEBUG
+        Self.logger.notice("NotificationCoordinator willPresent notification: \(notification.request.identifier, privacy: .public)")
+        #endif
+        return [.banner, .sound]
     }
 
-    func userNotificationCenter(
+    public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let actionID = response.actionIdentifier
+        let originalID = response.notification.request.identifier
         #if DEBUG
-        Self.logger.notice("NotificationCoordinator didReceive response action: \(response.actionIdentifier, privacy: .public)")
+        Self.logger.notice("NotificationCoordinator didReceive action=\(actionID, privacy: .public) originalID=\(originalID, privacy: .public)")
         #endif
-        // Primary action owner is NotificationViewController (which calls completion(.dismiss)).
-        // This fallback only runs if the rich extension is not loaded or user performs action from default UI.
-        if response.actionIdentifier == NotificationSchedulerConstants.snoozeActionID {
-            let request = ZmanimSnoozeRequest.make(from: response.notification.request.content)
-            do {
-                try await center.add(request)
+
+        switch actionID {
+        case NotificationSchedulerConstants.snoozeActionID:
+            let request = ZmanimSnoozeRequest.make(
+                from: response.notification.request.content,
+                originalIdentifier: originalID
+            )
+            center.add(request) { error in
                 #if DEBUG
-                Self.logger.notice("NotificationCoordinator fallback scheduled snooze: \(request.identifier, privacy: .public)")
+                if let error {
+                    Self.logger.error("NotificationCoordinator failed to schedule snooze: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    Self.logger.notice("NotificationCoordinator scheduled snooze: \(request.identifier, privacy: .public)")
+                }
                 #endif
-            } catch {
-                #if DEBUG
-                Self.logger.error("NotificationCoordinator fallback failed to schedule snooze: \(error.localizedDescription, privacy: .public)")
-                #endif
+                completionHandler()
             }
+        case NotificationSchedulerConstants.openActionID:
+            #if DEBUG
+            Self.logger.notice("NotificationCoordinator openAction selected")
+            #endif
+            completionHandler()
+        default:
+            completionHandler()
         }
     }
 }
