@@ -34,14 +34,9 @@ public struct ZmanimSkyBackdrop: View {
         GeometryReader { proxy in
             // Calculate height ensuring it covers behind status bar down through the hero clock
             let isLandscape = proxy.size.width > proxy.size.height
-            let backdropHeight: CGFloat
-            if isLandscape {
-                backdropHeight = max(340, proxy.size.height * 0.70)
-            } else {
-                // Adaptive height for iPhone / iPad portrait: covers status bar + header + solar arc + clock
-                let baseHeight = proxy.safeAreaInsets.top + 330
-                backdropHeight = min(max(baseHeight, 380), 460)
-            }
+            let backdropHeight: CGFloat = isLandscape
+                ? max(340, proxy.size.height * 0.70)
+                : min(max(proxy.safeAreaInsets.top + 330, 380), 460)
 
             SkyBackdrop(
                 date: date,
