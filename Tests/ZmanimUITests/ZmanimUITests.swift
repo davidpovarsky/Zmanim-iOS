@@ -63,6 +63,9 @@ final class ZmanimUITests: XCTestCase {
         app.launchArguments = ["-UITestMode", "YES", "-UITestShortSnooze", "YES"]
         app.launch()
 
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        dismissPermissionAlertIfPresent(springboard: springboard)
+
         let jerusalemText = app.staticTexts["ירושלים"]
         XCTAssertTrue(jerusalemText.waitForExistence(timeout: 15), "Expected Jerusalem zmanim to be loaded in UI test mode")
     }
