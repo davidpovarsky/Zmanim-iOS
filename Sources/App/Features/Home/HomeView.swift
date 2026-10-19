@@ -12,94 +12,7 @@ public struct HomeView: View {
     public var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 30)) { timeline in
-                let effectiveDate = effectiveDate(for: timeline.date)
-                let sunrise = ZmanDayResolver.sunrise(from: model.todayItems, date: effectiveDate, timeZone: model.timeZone)
-                let sunset = ZmanDayResolver.sunset(from: model.todayItems, date: effectiveDate, timeZone: model.timeZone)
-                let nextResult = NextZmanResolver.resolve(
-                    allItems: model.allItems,
-                    now: effectiveDate,
-                    timeZone: model.timeZone
-                )
-
-                let headerTextColor = ZmanimSkyBackdrop.headerColor(
-                    for: effectiveDate,
-                    timeZone: model.timeZone,
-                    sunrise: sunrise,
-                    sunset: sunset,
-                    condition: model.weatherModel.condition,
-                    cloudCover: model.weatherModel.cloudCover,
-                    colorScheme: colorScheme
-                )
-
-                ScrollView {
-                    VStack(spacing: 20) {
-                        HomeHeader(
-                            date: effectiveDate,
-                            timeZone: model.timeZone,
-                            cityName: model.cityName,
-                            presentation: model.weatherModel.presentation,
-                            isLoading: model.isLoading,
-                            textColor: headerTextColor,
-                            onWeatherTap: {
-                                isWeatherPopupPresented = true
-                            }
-                        )
-
-                        SolarHero(
-                            now: effectiveDate,
-                            items: model.todayItems,
-                            city: model.cityName,
-                            timeZone: model.timeZone
-                        )
-
-                        NextZmanCard(
-                            result: nextResult,
-                            isLoading: model.isLoading,
-                            errorMessage: model.errorMessage,
-                            timeZone: model.timeZone
-                        )
-
-                        ZmanimDayList(
-                            items: model.todayItems,
-                            now: effectiveDate,
-                            timeZone: model.timeZone
-                        )
-
-                        VStack(spacing: 4) {
-                            Text("נתוני הזמנים באדיבות Hebcal.com")
-                            if model.weatherModel.isAvailable {
-                                Text(model.weatherModel.presentation?.attribution ?? WeatherSnapshot.attribution)
-                            }
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 24)
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                }
-                .background {
-                    ZStack(alignment: .top) {
-                        Color.zmanBackground.ignoresSafeArea()
-                        if model.weatherModel.isAvailable {
-                            ZmanimSkyBackdrop(
-                                date: effectiveDate,
-                                timeZone: model.timeZone,
-                                sunrise: sunrise,
-                                sunset: sunset,
-                                condition: model.weatherModel.condition,
-                                cloudCover: model.weatherModel.cloudCover,
-                                isPaused: model.weatherModel.previewOverride != nil
-                            )
-                        }
-                    }
-                }
-                .onAppear {
-                    model.checkDayRollover(now: timeline.date)
-                }
-                .onChange(of: timeline.date) { _, newDate in
-                    model.checkDayRollover(now: newDate)
-                }
+                homeTimelineContent(for: timeline.date)
             }
             .navigationTitle("זמנים")
             .navigationBarTitleDisplayMode(.inline)
@@ -112,11 +25,9 @@ public struct HomeView: View {
                     }
                 }
 
-                #if DEBUG
                 ToolbarItem(placement: .topBarTrailing) {
                     weatherPreviewMenu
                 }
-                #endif
             }
             .overlay {
                 WeatherDetailPopup(
@@ -132,18 +43,116 @@ public struct HomeView: View {
         }
     }
 
+    @ViewBuilder
+    private func homeTimelineContent(for timelineDate: Date) -> some View {
+        let effDate = effectiveDate(for: timelineDate)
+        let sunrise = ZmanDayResolver.sunrise(from: model.todayItems, date: effDate, timeZone: model.timeZone)
+        let sunset = ZmanDayResolver.sunset(from: model.todayItems, date: effDate, timeZone: model.timeZone)
+        let nextResult = NextZmanResolver.resolve(
+            allItems: model.allItems,
+            now: effDate,
+            timeZone: model.timeZone
+        )
+
+        let headerTextColor = ZmanimSkyBackdrop.headerColor(
+            for: effDate,
+            timeZone: model.timeZone,
+            sunrise: sunrise,
+            sunset: sunset,
+            condition: model.weatherModel.condition,
+            cloudCover: model.weatherModel.cloudCover,
+            colorScheme: colorScheme
+        )
+
+        ScrollView {
+            VStack(spacing: 20) {
+                HomeHeader(
+                    date: effDate,
+                    timeZone: model.timeZone,
+                    cityName: model.cityName,
+                    presentation: model.weatherModel.presentation,
+                    isLoading: model.isLoading,
+                    textColor: headerTextColor,
+                    onWeatherTap: {
+                        isWeatherPopupPresented = true
+                    }
+                )
+
+                SolarHero(
+                    now: effDate,
+                    items: model.todayItems,
+                    city: model.cityName,
+                    timeZone: model.timeZone
+                )
+
+                NextZmanCard(
+                    result: nextResult,
+                    isLoading: model.isLoading,
+                    errorMessage: model.errorMessage,
+                    timeZone: model.timeZone
+                )
+
+                ZmanimDayList(
+                    items: model.todayItems,
+                    now: effDate,
+                    timeZone: model.timeZone
+                )
+
+                homeAttributionFooter
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+        }
+        .background {
+            homeBackdrop(effectiveDate: effDate, sunrise: sunrise, sunset: sunset)
+        }
+        .onAppear {
+            model.checkDayRollover(now: timelineDate)
+        }
+        .onChange(of: timelineDate) { _, newDate in
+            model.checkDayRollover(now: newDate)
+        }
+    }
+
+    @ViewBuilder
+    private func homeBackdrop(effectiveDate: Date, sunrise: Date?, sunset: Date?) -> some View {
+        ZStack(alignment: .top) {
+            Color.zmanBackground.ignoresSafeArea()
+            if model.weatherModel.isAvailable {
+                ZmanimSkyBackdrop(
+                    date: effectiveDate,
+                    timeZone: model.timeZone,
+                    sunrise: sunrise,
+                    sunset: sunset,
+                    condition: model.weatherModel.condition,
+                    cloudCover: model.weatherModel.cloudCover,
+                    isPaused: model.weatherModel.previewOverride != nil
+                )
+            }
+        }
+    }
+
+    private var homeAttributionFooter: some View {
+        VStack(spacing: 4) {
+            Text("נתוני הזמנים באדיבות Hebcal.com")
+            if model.weatherModel.isAvailable {
+                Text(model.weatherModel.presentation?.attribution ?? WeatherSnapshot.attribution)
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.bottom, 24)
+    }
+
     private func effectiveDate(for date: Date) -> Date {
-        #if DEBUG
         if let preview = model.weatherModel.previewOverride {
             let rise = model.todayItems.first { $0.key == "sunrise" }?.date
             let set = model.todayItems.first { $0.key == "sunset" }?.date
             return preview.simulatedDate(for: date, sunrise: rise, sunset: set)
         }
-        #endif
         return date
     }
 
-    #if DEBUG
     private var weatherPreviewMenu: some View {
         Menu {
             Button("מזג אוויר חי (ברירת מחדל)") {
@@ -159,7 +168,6 @@ public struct HomeView: View {
             Image(systemName: "cloud.sun.fill")
         }
     }
-    #endif
 }
 
 private struct SolarHero: View {

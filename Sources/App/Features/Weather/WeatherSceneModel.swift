@@ -131,7 +131,6 @@ public final class WeatherSceneModel: ObservableObject {
         }
     }
 
-    #if DEBUG
     public func setPreview(_ preview: WeatherScenePreview?) {
         self.previewOverride = preview
         if let preview {
@@ -190,10 +189,8 @@ public final class WeatherSceneModel: ObservableObject {
             now: now
         )
     }
-    #endif
 }
 
-#if DEBUG
 public enum WeatherScenePreview: String, CaseIterable, Identifiable {
     case clearMorning = "בוקר בהיר"
     case middaySun = "צהריים שטופי שמש"
@@ -280,4 +277,3 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
         return calendar.date(from: comps) ?? baseDate
     }
 }
-#endif
