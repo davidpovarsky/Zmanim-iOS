@@ -12,6 +12,8 @@ settings:
 packages:
   SwiftUISky:
     path: Packages/SwiftUISky
+  OneBusAwayWeather:
+    path: Packages/OneBusAwayWeather
 targets:
   Zmanim:
     type: application
@@ -36,6 +38,10 @@ targets:
     dependencies:
       - package: SwiftUISky
         product: SwiftUISky
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherCore
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherUI
       - target: ZmanimWidgets
         embed: true
       - target: ZmanimNotificationContent
@@ -96,6 +102,10 @@ targets:
       - Tests/ZmanimTests
     dependencies:
       - target: Zmanim
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherCore
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.Tests

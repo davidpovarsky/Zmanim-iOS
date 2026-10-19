@@ -23,6 +23,7 @@ Useful technical discoveries, undocumented behavior, shortcuts, implementation t
 - **XCUIApplication State During SpringBoard Dismissals**: When SpringBoard displays an expanded notification overlay or handles an action button, the host app process transitions through suspended states while SpringBoard animates dismissal. Immediate synchronous checks on `app.state == .runningForeground` fail transiently during animation; `app.wait(for: .runningForeground, timeout:)` or asserting `app.state != .notRunning` accurately confirms host process survival and foreground resumption.
 
 - **MET Norway Symbol Mapping Precedence**: Symbol codes containing `snowshowers` (e.g. `snowshowers_day`) also match substring `showers`. If `showers` or `rain` is matched first, snow showers are misclassified as rain. Strictly prioritizing snow/sleet condition checks before generic showers/rain ensures accurate precipitation rendering in both the forecast card and `SwiftUISky`.
+- **OneBusAway Israel Weather Package Extraction**: Porting the authoritative OneBusAway Israel weather UI and formatting components (`WeatherDetailPopup`, `WeatherDisplay`, `WeatherFormatter`) into a focused local Swift package (`Packages/OneBusAwayWeather`) preserves exact visual geometry, icon palettes, 3-slot stats with literal em-dash placeholders, and template `"j"` short-hour formatting while isolating the app from transitive transit/map dependencies.
 - **WidgetKit Interactive Paging Expiration & Timeline Entries**: When paging widgets with `AppIntent` without opening the host app, WidgetKit reloads timelines asynchronously. Pairing `expiresAt = now + 60s` in the App Group with a future timeline entry at `expiresAt` (page 0) allows best-effort automatic return to the initial page while respecting WidgetKit energy budgets.
 - **End-of-Day Next Zman Resolver**: Filtering only `todayItems.first(where: { $0.date > now })` causes false "loading" states after the last daily zman. Sourcing upcoming events from multi-day Hebcal data and tagging events on subsequent local days with a "מחר" indicator provides continuous, truthful display without unneeded network requests.
 
@@ -46,6 +47,10 @@ Use Markdown checkboxes where useful:
 
 Completed items that are still useful to retain because they document an important decision, discovery, or implementation.
 
+- [x] Authoritative OneBusAway Israel Weather Component Port
+  - Implemented: 2026-10-19
+  - Branch: `feature/met-weather-widget-paging-eod`
+  - Notes: Ported original `WeatherDetailPopup`, `WeatherDisplay`, `WeatherFormatter` from `onebusaway-ios@6b8d381` into local package `Packages/OneBusAwayWeather`. Retired custom duplicate implementations. Connected to genuine MET Norway client via `ZmanimWeatherDisplayAdapter`. Added complete Hebrew translations and time zone-aware hour formatting.
 - [x] Master Implementation: MET Norway, No-Fake Weather, Widget 5-Item Paging, End-of-Day Next Zman, and SwiftUISky TimeZone Support
   - Implemented: 2026-10-19
   - Branch: `feature/met-weather-widget-paging-eod`

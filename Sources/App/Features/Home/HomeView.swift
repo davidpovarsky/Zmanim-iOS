@@ -1,3 +1,4 @@
+import OneBusAwayWeatherUI
 import SwiftUI
 import SwiftUISky
 
@@ -27,7 +28,7 @@ public struct HomeView: View {
             }
             .overlay {
                 WeatherDetailPopup(
-                    presentation: model.weatherModel.presentation,
+                    display: model.weatherModel.weatherDisplay,
                     isPresented: $isWeatherPopupPresented
                 )
             }
@@ -68,7 +69,7 @@ public struct HomeView: View {
                     date: timelineDate,
                     timeZone: model.timeZone,
                     cityName: model.cityName,
-                    presentation: model.weatherModel.presentation,
+                    display: model.weatherModel.weatherDisplay,
                     isLoading: model.isLoading,
                     textColor: headerTextColor,
                     onWeatherTap: {
@@ -135,7 +136,7 @@ public struct HomeView: View {
         VStack(spacing: 4) {
             Text("נתוני הזמנים באדיבות Hebcal.com")
             if model.weatherModel.isAvailable {
-                Text(model.weatherModel.presentation?.attribution ?? WeatherSnapshot.attribution)
+                Text(model.weatherModel.weatherDisplay?.sourceAttribution ?? WeatherSnapshot.attribution)
             }
         }
         .font(.caption2)

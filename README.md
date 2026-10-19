@@ -5,7 +5,7 @@ Modern native iOS zmanim app with a live solar horizon, Hebcal-backed times, loc
 ## Architecture
 - **App**: SwiftUI home (`HomeView`, `HomeHeader`, `NextZmanCard`, `ZmanimDayList`, `SolarHero`) + notification settings + weather popup.
 - **Shared**: models, design system, App Group cache, App Intents (`WidgetPagingIntents`, `ToggleQuickReminderIntent`, `OpenZmanimIntent`), `WidgetDaySelector`, `WidgetPageReducer`, `WidgetPageStateStore`, `NextZmanResolver`, `ZmanDayResolver`.
-- **Weather (`Features/Weather`)**: MET Norway Locationforecast 2.0 compact client (`METNorwayWeatherClient`), caching with HTTP 304/Expires (`WeatherCache`), symbol mapper (`METSymbolMapper`), presentation models, interactive header button, and native popup (`WeatherDetailPopup`).
+- **Weather (`Packages/OneBusAwayWeather`, `Features/Weather`)**: Port of the authoritative OneBusAway Israel weather component (`OneBusAwayWeatherCore`, `OneBusAwayWeatherUI`), MET Norway Locationforecast 2.0 compact client (`METNorwayWeatherClient`), HTTP caching (`WeatherCache`), display adapter (`ZmanimWeatherDisplayAdapter`), interactive header button, and native popup (`WeatherDetailPopup`).
 - **Widgets**: small/medium/large/extra-large, Lock Screen accessories, Live Activity.
 - **Notification Content Extension**: expanded rich alert UI (`NotificationViewController`).
 - **Services**: Core Location, Hebcal, notification scheduling.

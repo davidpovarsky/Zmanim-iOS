@@ -1,0 +1,9 @@
+"weather.button_accessibility_value_format" = "%1$@, %2$@";
+"weather.chance_of_rain_format" = "Chance of Rain: %d%%";
+"weather.high_low_format" = "H:%1$@  L:%2$@";
+"weather.now" = "Now";
+"weather.percent_format" = "%d%%";
+"weather.stat.a11y_fmt" = "%1$@: %2$@";
+"weather.stat.feels_like" = "Feels like";
+"weather.stat.precip" = "Chance of precipitation";
+"weather.stat.wind" = "Wind speed";

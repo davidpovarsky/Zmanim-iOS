@@ -1,10 +1,11 @@
 import SwiftUI
+import OneBusAwayWeatherUI
 
 public struct HomeHeader: View {
     public let date: Date
     public let timeZone: TimeZone
     public let cityName: String
-    public let presentation: WeatherPresentation?
+    public let display: WeatherDisplay?
     public let isLoading: Bool
     public let textColor: Color
     public let onWeatherTap: () -> Void
@@ -13,7 +14,7 @@ public struct HomeHeader: View {
         date: Date,
         timeZone: TimeZone,
         cityName: String,
-        presentation: WeatherPresentation?,
+        display: WeatherDisplay?,
         isLoading: Bool,
         textColor: Color,
         onWeatherTap: @escaping () -> Void
@@ -21,7 +22,7 @@ public struct HomeHeader: View {
         self.date = date
         self.timeZone = timeZone
         self.cityName = cityName
-        self.presentation = presentation
+        self.display = display
         self.isLoading = isLoading
         self.textColor = textColor
         self.onWeatherTap = onWeatherTap
@@ -42,12 +43,12 @@ public struct HomeHeader: View {
             Spacer()
 
             // In RTL locale (Hebrew), trailing is on the left (matches weather_button_marked.png)
-            if isLoading && presentation == nil {
+            if isLoading && display == nil {
                 ProgressView().tint(textColor)
             } else {
                 WeatherHeaderButton(
                     cityName: cityName,
-                    presentation: presentation,
+                    display: display,
                     textColor: textColor,
                     action: onWeatherTap
                 )

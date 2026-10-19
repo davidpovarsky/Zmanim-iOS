@@ -1,6 +1,8 @@
 import Combine
 import CoreLocation
 import Foundation
+import OneBusAwayWeatherCore
+import OneBusAwayWeatherUI
 import SwiftUI
 import os
 
@@ -12,7 +14,7 @@ public final class WeatherSceneModel: ObservableObject {
     @Published public var condition: WeatherCondition? = nil
     @Published public var cloudCover: Double = 0.0
     @Published public var currentSnapshot: WeatherSnapshot? = nil
-    @Published public var presentation: WeatherPresentation? = nil
+    @Published public var weatherDisplay: WeatherDisplay? = nil
     @Published public var lastUpdated: Date? = nil
     @Published public var isFetching: Bool = false
     #if DEBUG
@@ -29,7 +31,7 @@ public final class WeatherSceneModel: ObservableObject {
         self.condition = nil
         self.cloudCover = 0.0
         self.currentSnapshot = nil
-        self.presentation = nil
+        self.weatherDisplay = nil
     }
 
     /// Updates the weather state strictly using genuine MET Norway data or cached snapshot.
@@ -67,8 +69,8 @@ public final class WeatherSceneModel: ObservableObject {
 
             guard generation == self.updateGeneration else { return }
 
-            guard let pres = WeatherPresentation(
-                snapshot: snapshot,
+            guard let display = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
+                from: snapshot,
                 cityName: cityName,
                 timeZone: timeZone,
                 now: now
@@ -88,19 +90,15 @@ public final class WeatherSceneModel: ObservableObject {
                 isNight = hour < 6 || hour >= 19
             }
 
-            let iconKey = currentHour?.iconKey ?? "unknown"
-            var resolvedCondition = METSymbolMapper.weatherCondition(for: iconKey, isNight: isNight)
-
-            // Severe/precipitation conditions take precedence over twilight
-            let isPrecipOrSevere = ["thunderstorm", "snow", "sleet", "rain", "fog"].contains(iconKey)
-            if !isPrecipOrSevere, resolvedCondition != nil {
-                let twilightWindow: TimeInterval = 45 * 60
-                if let sunrise, abs(now.timeIntervalSince(sunrise)) <= twilightWindow {
-                    resolvedCondition = .sunrise
-                } else if let sunset, abs(now.timeIntervalSince(sunset)) <= twilightWindow {
-                    resolvedCondition = .sunset
-                }
-            }
+            let rawSymbol = currentHour?.symbolCode ?? "unknown"
+            let iconKey = METLocationWeatherConverter.iconKey(from: rawSymbol)
+            let resolvedCondition = ZmanimWeatherDisplayAdapter.resolveSkyCondition(
+                iconKey: iconKey,
+                isNight: isNight,
+                sunrise: sunrise,
+                sunset: sunset,
+                now: now
+            )
 
             let clouds: Double
             if let cloudFraction = currentHour?.cloudAreaFractionPercent {
@@ -123,7 +121,7 @@ public final class WeatherSceneModel: ObservableObject {
             }
 
             self.currentSnapshot = snapshot
-            self.presentation = pres
+            self.weatherDisplay = display
             self.condition = resolvedCondition
             self.cloudCover = clouds
             self.lastUpdated = snapshot.retrievedAt
@@ -137,13 +135,18 @@ public final class WeatherSceneModel: ObservableObject {
                let expires = existing.expiresAt, now < expires,
                CLLocation(latitude: existing.locationLatitude, longitude: existing.locationLongitude)
                    .distance(from: CLLocation(latitude: location.latitude, longitude: location.longitude)) < 5000,
-               let pres = WeatherPresentation(snapshot: existing, cityName: cityName, timeZone: timeZone, now: now) {
-                self.presentation = pres
+               let display = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
+                   from: existing,
+                   cityName: cityName,
+                   timeZone: timeZone,
+                   now: now
+               ) {
+                self.weatherDisplay = display
                 self.isAvailable = true
             } else {
                 // Expired, failed, or wrong location: strictly reset to unavailable
                 self.currentSnapshot = nil
-                self.presentation = nil
+                self.weatherDisplay = nil
                 self.condition = nil
                 self.cloudCover = 0.0
                 self.isAvailable = false
@@ -155,7 +158,7 @@ public final class WeatherSceneModel: ObservableObject {
     public func resetForLocationChange() {
         self.updateGeneration &+= 1
         self.currentSnapshot = nil
-        self.presentation = nil
+        self.weatherDisplay = nil
         self.condition = nil
         self.cloudCover = 0.0
         self.isAvailable = false
@@ -185,7 +188,7 @@ public final class WeatherSceneModel: ObservableObject {
             self.isAvailable = false
             self.condition = nil
             self.cloudCover = 0.0
-            self.presentation = nil
+            self.weatherDisplay = nil
         }
     }
 
@@ -202,7 +205,7 @@ public final class WeatherSceneModel: ObservableObject {
         self.cloudCover = preview.cloudCover
         self.lastUpdated = now
 
-        let mockHours: [WeatherHour] = (0..<24).map { i in
+        let mockHours: [WeatherHour] = (0..<25).map { i in
             let hourDate = now.addingTimeInterval(Double(i * 3600))
             return WeatherHour(
                 time: hourDate,
@@ -224,8 +227,8 @@ public final class WeatherSceneModel: ObservableObject {
         )
 
         self.currentSnapshot = mockSnapshot
-        self.presentation = WeatherPresentation(
-            snapshot: mockSnapshot,
+        self.weatherDisplay = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
+            from: mockSnapshot,
             cityName: cityName,
             timeZone: timeZone,
             now: now
@@ -254,7 +257,8 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
         case .clearMorning, .middaySun: return .clearDay
         case .partlyCloudyAfternoon: return .partlyCloudyDay
         case .overcastAfternoon: return .overcastDay
-        case .goldenSunset, .twilight: return .sunset
+        case .goldenSunset: return .sunset
+        case .twilight: return .sunrise
         case .clearNight: return .clearNight
         case .rain: return .rain
         case .snow: return .snow
@@ -264,13 +268,13 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
 
     public var cloudCover: Double {
         switch self {
-        case .clearMorning, .middaySun, .clearNight: return 0.05
-        case .partlyCloudyAfternoon: return 0.40
-        case .overcastAfternoon: return 0.95
+        case .clearMorning, .middaySun, .clearNight: return 0.0
+        case .partlyCloudyAfternoon: return 0.45
+        case .overcastAfternoon: return 0.85
         case .goldenSunset, .twilight: return 0.15
-        case .rain: return 0.85
-        case .snow: return 0.70
-        case .fog: return 0.60
+        case .rain: return 0.90
+        case .snow: return 0.80
+        case .fog: return 0.70
         }
     }
 
@@ -279,7 +283,7 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
         case .clearMorning, .middaySun: return "clearsky_day"
         case .partlyCloudyAfternoon: return "partlycloudy_day"
         case .overcastAfternoon: return "cloudy"
-        case .goldenSunset, .twilight: return "fair_day"
+        case .goldenSunset, .twilight: return "clearsky_day"
         case .clearNight: return "clearsky_night"
         case .rain: return "rain"
         case .snow: return "snow"
@@ -288,37 +292,15 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
     }
 
     public var iconKey: String {
-        METSymbolMapper.iconKey(from: symbolCode)
-    }
-
-    public func simulatedDate(for baseDate: Date, sunrise: Date?, sunset: Date?) -> Date {
-        let calendar = Calendar.current
-        var comps = calendar.dateComponents([.year, .month, .day], from: baseDate)
         switch self {
-        case .clearMorning:
-            comps.hour = 8; comps.minute = 30
-        case .middaySun:
-            comps.hour = 12; comps.minute = 30
-        case .partlyCloudyAfternoon:
-            comps.hour = 15; comps.minute = 0
-        case .overcastAfternoon:
-            comps.hour = 16; comps.minute = 30
-        case .goldenSunset:
-            if let sunset { return sunset.addingTimeInterval(-10 * 60) }
-            comps.hour = 18; comps.minute = 15
-        case .twilight:
-            if let sunset { return sunset.addingTimeInterval(20 * 60) }
-            comps.hour = 18; comps.minute = 45
-        case .clearNight:
-            comps.hour = 23; comps.minute = 30
-        case .rain:
-            comps.hour = 14; comps.minute = 0
-        case .snow:
-            comps.hour = 10; comps.minute = 0
-        case .fog:
-            comps.hour = 7; comps.minute = 0
+        case .clearMorning, .middaySun, .goldenSunset, .twilight: return "clear-day"
+        case .partlyCloudyAfternoon: return "partly-cloudy-day"
+        case .overcastAfternoon: return "cloudy"
+        case .clearNight: return "clear-night"
+        case .rain: return "rain"
+        case .snow: return "snow"
+        case .fog: return "fog"
         }
-        return calendar.date(from: comps) ?? baseDate
     }
 }
 #endif

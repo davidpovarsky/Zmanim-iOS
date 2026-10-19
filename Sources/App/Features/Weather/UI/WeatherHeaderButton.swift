@@ -1,25 +1,27 @@
 import SwiftUI
+import OneBusAwayWeatherCore
+import OneBusAwayWeatherUI
 
 public struct WeatherHeaderButton: View {
     public let cityName: String
-    public let presentation: WeatherPresentation?
+    public let display: WeatherDisplay?
     public let textColor: Color
     public let action: () -> Void
 
     public init(
         cityName: String,
-        presentation: WeatherPresentation?,
+        display: WeatherDisplay?,
         textColor: Color,
         action: @escaping () -> Void
     ) {
         self.cityName = cityName
-        self.presentation = presentation
+        self.display = display
         self.textColor = textColor
         self.action = action
     }
 
     public var body: some View {
-        if let presentation {
+        if let display {
             Button(action: action) {
                 HStack(spacing: 6) {
                     HStack(spacing: 4) {
@@ -33,11 +35,11 @@ public struct WeatherHeaderButton: View {
                         .foregroundStyle(textColor.opacity(0.60))
 
                     HStack(spacing: 4) {
-                        Image(systemName: METSymbolMapper.systemImageName(for: presentation.header.iconName))
+                        Image(systemName: WeatherFormatter.systemImageName(for: display.header.iconName))
                             .font(.caption)
-                        Text(presentation.buttonTitle)
+                        Text(display.buttonTitle)
                             .font(.caption.bold())
-                        Text(presentation.header.conditionSummary)
+                        Text(display.header.conditionSummary)
                             .font(.caption)
                     }
                     .foregroundStyle(textColor.opacity(0.90))
@@ -47,7 +49,7 @@ public struct WeatherHeaderButton: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("תחזית מזג אוויר עבור \(cityName): \(presentation.buttonTitle), \(presentation.header.conditionSummary)")
+            .accessibilityLabel("תחזית מזג אוויר עבור \(cityName): \(display.buttonTitle), \(display.header.conditionSummary)")
             .accessibilityHint("הקש לפתיחת כרטיס תחזית מפורט")
             .accessibilityAddTraits(.isButton)
         } else {

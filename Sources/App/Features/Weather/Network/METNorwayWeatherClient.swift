@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import OneBusAwayWeatherCore
 import os
 
 public enum METWeatherError: LocalizedError, Equatable {
@@ -164,7 +165,7 @@ public actor METNorwayWeatherClient {
             let precip = entry.data.next1Hours?.details?.probabilityOfPrecipitation
                 ?? entry.data.next6Hours?.details?.probabilityOfPrecipitation
 
-            let iconKey = METSymbolMapper.iconKey(from: symbolCode)
+            let iconKey = METLocationWeatherConverter.iconKey(from: symbolCode)
 
             return WeatherHour(
                 time: date,
