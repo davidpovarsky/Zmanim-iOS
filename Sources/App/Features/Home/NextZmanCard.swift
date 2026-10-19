@@ -5,17 +5,20 @@ public struct NextZmanCard: View {
     public let isLoading: Bool
     public let errorMessage: String?
     public let timeZone: TimeZone
+    public let now: Date
 
     public init(
         result: NextZmanResult?,
         isLoading: Bool,
         errorMessage: String?,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        now: Date = Date()
     ) {
         self.result = result
         self.isLoading = isLoading
         self.errorMessage = errorMessage
         self.timeZone = timeZone
+        self.now = now
     }
 
     public var body: some View {
@@ -53,7 +56,7 @@ public struct NextZmanCard: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(formatTime(item.date))
                         .font(.title2.monospacedDigit().bold())
-                    Text(item.date, style: .relative)
+                    Text(formatRemaining(to: item.date, from: now))
                         .font(.caption)
                         .foregroundStyle(Color.zmanOrange)
                 }
@@ -73,6 +76,21 @@ public struct NextZmanCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(22)
                 .zmanCard()
+        }
+    }
+
+    private func formatRemaining(to target: Date, from current: Date) -> String {
+        let diff = target.timeIntervalSince(current)
+        guard diff > 0 else { return "עכשיו" }
+        let totalMinutes = Int(ceil(diff / 60.0))
+        let hours = totalMinutes / 60
+        let mins = totalMinutes % 60
+        if hours == 0 {
+            return "בעוד \(mins) דק׳"
+        } else if mins == 0 {
+            return "בעוד \(hours) שעות"
+        } else {
+            return "בעוד \(hours) שעות ו-\(mins) דק׳"
         }
     }
 

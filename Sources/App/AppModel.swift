@@ -97,6 +97,9 @@ final class AppModel: ObservableObject {
     }
 
     public func refresh() {
+        Task {
+            await refreshWeather(force: true)
+        }
         if settings.locationMode == .fixed {
             Task { await refreshFixedCity() }
         } else {
@@ -126,6 +129,24 @@ final class AppModel: ObservableObject {
         }
     }
 
+    public func refreshWeather(force: Bool = false) async {
+        guard let location = currentLocation else { return }
+        let rise = ZmanDayResolver.sunrise(from: todayItems, date: Date(), timeZone: timeZone)
+        let set = ZmanDayResolver.sunset(from: todayItems, date: Date(), timeZone: timeZone)
+        let coord = location.coordinate
+        let city = cityName
+        let zone = timeZone
+        await weatherModel.update(
+            location: coord,
+            cityName: city,
+            timeZone: zone,
+            now: Date(),
+            sunrise: rise,
+            sunset: set,
+            force: force
+        )
+    }
+
     public func load(
         location: CLLocation,
         preferredCity: String? = nil,
@@ -138,6 +159,7 @@ final class AppModel: ObservableObject {
             cal.timeZone = checkZone
             let isCurrentDay = todayItems.first.map { cal.isDate($0.date, inSameDayAs: Date()) } ?? false
             if isCurrentDay && !todayItems.isEmpty {
+                await refreshWeather(force: force)
                 return
             }
         }
@@ -171,20 +193,7 @@ final class AppModel: ObservableObject {
             await NotificationScheduler.rescheduleIfAuthorized(settings: settings, items: allItems, timeZone: zone)
 
             // Update weather asynchronously with genuine MET Norway data
-            let rise = ZmanDayResolver.sunrise(from: todayItems, date: Date(), timeZone: zone)
-            let set = ZmanDayResolver.sunset(from: todayItems, date: Date(), timeZone: zone)
-            let coord = location.coordinate
-            Task {
-                await weatherModel.update(
-                    location: coord,
-                    cityName: city,
-                    timeZone: zone,
-                    now: Date(),
-                    sunrise: rise,
-                    sunset: set,
-                    force: force
-                )
-            }
+            await refreshWeather(force: force)
         } catch {
             errorMessage = error.localizedDescription
         }

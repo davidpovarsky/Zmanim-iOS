@@ -53,4 +53,12 @@ final class METSymbolMapperTests: XCTestCase {
         XCTAssertEqual(METSymbolMapper.systemImageName(for: "snow"), "cloud.snow.fill")
         XCTAssertEqual(METSymbolMapper.systemImageName(for: "thunderstorm"), "cloud.bolt.rain.fill")
     }
+
+    func testUnknownSymbolCodeReturnsUnknownAndNil() {
+        XCTAssertEqual(METSymbolMapper.iconKey(from: "unknown"), "unknown")
+        XCTAssertEqual(METSymbolMapper.iconKey(from: ""), "unknown")
+        XCTAssertEqual(METSymbolMapper.conditionText(for: "unknown"), "—")
+        XCTAssertEqual(METSymbolMapper.conditionText(for: ""), "—")
+        XCTAssertNil(METSymbolMapper.weatherCondition(for: "unknown", isNight: false))
+    }
 }

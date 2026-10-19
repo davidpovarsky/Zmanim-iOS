@@ -15,10 +15,13 @@ public final class WeatherSceneModel: ObservableObject {
     @Published public var presentation: WeatherPresentation? = nil
     @Published public var lastUpdated: Date? = nil
     @Published public var isFetching: Bool = false
+    #if DEBUG
     @Published public var previewOverride: WeatherScenePreview? = nil
+    #endif
 
     private var currentCoordinate: CLLocationCoordinate2D?
     private var currentCityName: String = ""
+    private var updateGeneration: UInt64 = 0
 
     public init() {
         // Starts strictly unavailable with no fabricated weather data
@@ -39,6 +42,8 @@ public final class WeatherSceneModel: ObservableObject {
         sunset: Date? = nil,
         force: Bool = false
     ) async {
+        self.updateGeneration &+= 1
+        let generation = self.updateGeneration
         self.currentCoordinate = location
         self.currentCityName = cityName
 
@@ -60,6 +65,8 @@ public final class WeatherSceneModel: ObservableObject {
                 force: force
             )
 
+            guard generation == self.updateGeneration else { return }
+
             guard let pres = WeatherPresentation(
                 snapshot: snapshot,
                 cityName: cityName,
@@ -69,7 +76,8 @@ public final class WeatherSceneModel: ObservableObject {
                 throw METWeatherError.emptyData
             }
 
-            let currentHour = snapshot.hours.last(where: { $0.time <= now }) ?? snapshot.hours.first
+            let currentHour = snapshot.hours.first(where: { abs($0.time.timeIntervalSince(now)) <= 3600 })
+                ?? snapshot.hours.last(where: { $0.time <= now && now.timeIntervalSince($0.time) <= 7200 })
 
             // Determine day/night relative to actual Halachic sunrise/sunset
             let isNight: Bool
@@ -80,12 +88,12 @@ public final class WeatherSceneModel: ObservableObject {
                 isNight = hour < 6 || hour >= 19
             }
 
-            let iconKey = currentHour?.iconKey ?? "cloudy"
+            let iconKey = currentHour?.iconKey ?? "unknown"
             var resolvedCondition = METSymbolMapper.weatherCondition(for: iconKey, isNight: isNight)
 
             // Severe/precipitation conditions take precedence over twilight
             let isPrecipOrSevere = ["thunderstorm", "snow", "sleet", "rain", "fog"].contains(iconKey)
-            if !isPrecipOrSevere {
+            if !isPrecipOrSevere, resolvedCondition != nil {
                 let twilightWindow: TimeInterval = 45 * 60
                 if let sunrise, abs(now.timeIntervalSince(sunrise)) <= twilightWindow {
                     resolvedCondition = .sunrise
@@ -94,7 +102,25 @@ public final class WeatherSceneModel: ObservableObject {
                 }
             }
 
-            let clouds = (currentHour?.cloudAreaFractionPercent ?? 20.0) / 100.0
+            let clouds: Double
+            if let cloudFraction = currentHour?.cloudAreaFractionPercent {
+                clouds = cloudFraction / 100.0
+            } else if let resolvedCondition {
+                switch resolvedCondition {
+                case .clearDay, .clearNight, .sunrise, .sunset:
+                    clouds = 0.0
+                case .partlyCloudyDay:
+                    clouds = 0.4
+                case .overcastDay, .cloudyNight:
+                    clouds = 0.85
+                case .rain, .snow, .thunderstorm:
+                    clouds = 0.9
+                case .fog:
+                    clouds = 0.7
+                }
+            } else {
+                clouds = 0.0
+            }
 
             self.currentSnapshot = snapshot
             self.presentation = pres
@@ -103,13 +129,19 @@ public final class WeatherSceneModel: ObservableObject {
             self.lastUpdated = snapshot.retrievedAt
             self.isAvailable = true
         } catch {
+            guard generation == self.updateGeneration else { return }
             Self.logger.warning("Weather fetch failed: \(error.localizedDescription, privacy: .public)")
-            // If there's an existing valid snapshot, retain it; otherwise reset to unavailable
+
+            // Only retain an existing snapshot if it is STILL unexpired AND within 5km of the active location
             if let existing = currentSnapshot,
+               let expires = existing.expiresAt, now < expires,
+               CLLocation(latitude: existing.locationLatitude, longitude: existing.locationLongitude)
+                   .distance(from: CLLocation(latitude: location.latitude, longitude: location.longitude)) < 5000,
                let pres = WeatherPresentation(snapshot: existing, cityName: cityName, timeZone: timeZone, now: now) {
                 self.presentation = pres
                 self.isAvailable = true
             } else {
+                // Expired, failed, or wrong location: strictly reset to unavailable
                 self.currentSnapshot = nil
                 self.presentation = nil
                 self.condition = nil
@@ -121,6 +153,7 @@ public final class WeatherSceneModel: ObservableObject {
 
     /// Resets the model when changing locations or cities.
     public func resetForLocationChange() {
+        self.updateGeneration &+= 1
         self.currentSnapshot = nil
         self.presentation = nil
         self.condition = nil
@@ -131,7 +164,12 @@ public final class WeatherSceneModel: ObservableObject {
         }
     }
 
+    #if DEBUG
     public func setPreview(_ preview: WeatherScenePreview?) {
+        // Strictly restricted to test harness launch arguments; never available in regular app flow
+        guard ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("-WeatherPreview:") }) else {
+            return
+        }
         self.previewOverride = preview
         if let preview {
             applyPreview(
@@ -164,21 +202,25 @@ public final class WeatherSceneModel: ObservableObject {
         self.cloudCover = preview.cloudCover
         self.lastUpdated = now
 
-        let mockHour = WeatherHour(
-            time: now,
-            temperatureCelsius: 22.0,
-            windMetersPerSecond: 3.5,
-            precipitationChancePercent: preview == .rain ? 80.0 : (preview == .snow ? 70.0 : 0.0),
-            cloudAreaFractionPercent: preview.cloudCover * 100.0,
-            symbolCode: preview.symbolCode,
-            iconKey: preview.iconKey
-        )
+        let mockHours: [WeatherHour] = (0..<24).map { i in
+            let hourDate = now.addingTimeInterval(Double(i * 3600))
+            return WeatherHour(
+                time: hourDate,
+                temperatureCelsius: 18.0 + Double(i % 5),
+                windMetersPerSecond: 3.5,
+                precipitationChancePercent: preview == .rain ? 80.0 : (preview == .snow ? 70.0 : 0.0),
+                cloudAreaFractionPercent: preview.cloudCover * 100.0,
+                symbolCode: preview.symbolCode,
+                iconKey: preview.iconKey
+            )
+        }
 
         let mockSnapshot = WeatherSnapshot(
-            hours: [mockHour],
+            hours: mockHours,
             retrievedAt: now,
             locationLatitude: 31.778,
-            locationLongitude: 35.235
+            locationLongitude: 35.235,
+            expiresAt: now.addingTimeInterval(1800)
         )
 
         self.currentSnapshot = mockSnapshot
@@ -189,8 +231,10 @@ public final class WeatherSceneModel: ObservableObject {
             now: now
         )
     }
+    #endif
 }
 
+#if DEBUG
 public enum WeatherScenePreview: String, CaseIterable, Identifiable {
     case clearMorning = "בוקר בהיר"
     case middaySun = "צהריים שטופי שמש"
@@ -277,3 +321,4 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
         return calendar.date(from: comps) ?? baseDate
     }
 }
+#endif

@@ -24,10 +24,6 @@ public struct HomeView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    weatherPreviewMenu
-                }
             }
             .overlay {
                 WeatherDetailPopup(
@@ -38,6 +34,9 @@ public struct HomeView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     model.checkDayRollover(now: Date())
+                    Task {
+                        await model.refreshWeather(force: false)
+                    }
                 }
             }
         }
@@ -45,17 +44,16 @@ public struct HomeView: View {
 
     @ViewBuilder
     private func homeTimelineContent(for timelineDate: Date) -> some View {
-        let effDate = effectiveDate(for: timelineDate)
-        let sunrise = ZmanDayResolver.sunrise(from: model.todayItems, date: effDate, timeZone: model.timeZone)
-        let sunset = ZmanDayResolver.sunset(from: model.todayItems, date: effDate, timeZone: model.timeZone)
+        let sunrise = ZmanDayResolver.sunrise(from: model.todayItems, date: timelineDate, timeZone: model.timeZone)
+        let sunset = ZmanDayResolver.sunset(from: model.todayItems, date: timelineDate, timeZone: model.timeZone)
         let nextResult = NextZmanResolver.resolve(
             allItems: model.allItems,
-            now: effDate,
+            now: timelineDate,
             timeZone: model.timeZone
         )
 
         let headerTextColor = ZmanimSkyBackdrop.headerColor(
-            for: effDate,
+            for: timelineDate,
             timeZone: model.timeZone,
             sunrise: sunrise,
             sunset: sunset,
@@ -67,7 +65,7 @@ public struct HomeView: View {
         ScrollView {
             VStack(spacing: 20) {
                 HomeHeader(
-                    date: effDate,
+                    date: timelineDate,
                     timeZone: model.timeZone,
                     cityName: model.cityName,
                     presentation: model.weatherModel.presentation,
@@ -79,7 +77,7 @@ public struct HomeView: View {
                 )
 
                 SolarHero(
-                    now: effDate,
+                    now: timelineDate,
                     items: model.todayItems,
                     city: model.cityName,
                     timeZone: model.timeZone
@@ -89,12 +87,13 @@ public struct HomeView: View {
                     result: nextResult,
                     isLoading: model.isLoading,
                     errorMessage: model.errorMessage,
-                    timeZone: model.timeZone
+                    timeZone: model.timeZone,
+                    now: timelineDate
                 )
 
                 ZmanimDayList(
                     items: model.todayItems,
-                    now: effDate,
+                    now: timelineDate,
                     timeZone: model.timeZone
                 )
 
@@ -104,7 +103,7 @@ public struct HomeView: View {
             .padding(.top, 12)
         }
         .background {
-            homeBackdrop(effectiveDate: effDate, sunrise: sunrise, sunset: sunset)
+            homeBackdrop(date: timelineDate, sunrise: sunrise, sunset: sunset)
         }
         .onAppear {
             model.checkDayRollover(now: timelineDate)
@@ -115,18 +114,18 @@ public struct HomeView: View {
     }
 
     @ViewBuilder
-    private func homeBackdrop(effectiveDate: Date, sunrise: Date?, sunset: Date?) -> some View {
+    private func homeBackdrop(date: Date, sunrise: Date?, sunset: Date?) -> some View {
         ZStack(alignment: .top) {
             Color.zmanBackground.ignoresSafeArea()
             if model.weatherModel.isAvailable {
                 ZmanimSkyBackdrop(
-                    date: effectiveDate,
+                    date: date,
                     timeZone: model.timeZone,
                     sunrise: sunrise,
                     sunset: sunset,
                     condition: model.weatherModel.condition,
                     cloudCover: model.weatherModel.cloudCover,
-                    isPaused: model.weatherModel.previewOverride != nil
+                    isPaused: scenePhase != .active
                 )
             }
         }
@@ -142,31 +141,6 @@ public struct HomeView: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
         .padding(.bottom, 24)
-    }
-
-    private func effectiveDate(for date: Date) -> Date {
-        if let preview = model.weatherModel.previewOverride {
-            let rise = model.todayItems.first { $0.key == "sunrise" }?.date
-            let set = model.todayItems.first { $0.key == "sunset" }?.date
-            return preview.simulatedDate(for: date, sunrise: rise, sunset: set)
-        }
-        return date
-    }
-
-    private var weatherPreviewMenu: some View {
-        Menu {
-            Button("מזג אוויר חי (ברירת מחדל)") {
-                model.weatherModel.setPreview(nil)
-            }
-            Divider()
-            ForEach(WeatherScenePreview.allCases) { preview in
-                Button(preview.rawValue) {
-                    model.weatherModel.setPreview(preview)
-                }
-            }
-        } label: {
-            Image(systemName: "cloud.sun.fill")
-        }
     }
 }
 

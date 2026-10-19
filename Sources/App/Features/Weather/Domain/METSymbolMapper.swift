@@ -5,7 +5,8 @@ public enum METSymbolMapper {
     /// Crucially guarantees that snow and sleet conditions (e.g. `snowshowers_day`)
     /// are evaluated before generic `showers` or `rain`, preventing misclassification.
     public static func iconKey(from symbol: String) -> String {
-        let code = symbol.lowercased()
+        let code = symbol.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !code.isEmpty, code != "unknown" else { return "unknown" }
         let isNight = code.contains("_night")
         let suffix = isNight ? "night" : "day"
 
@@ -34,12 +35,13 @@ public enum METSymbolMapper {
         if code.contains("clearsky") || code.contains("clear") {
             return "clear-\(suffix)"
         }
-        return "cloudy"
+        return "unknown"
     }
 
     /// Hebrew condition summary text for display.
     public static func conditionText(for symbol: String) -> String {
-        let code = symbol.lowercased()
+        let code = symbol.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !code.isEmpty, code != "unknown" else { return "—" }
         let isNight = code.contains("_night")
 
         if code.contains("thunder") {
@@ -66,7 +68,7 @@ public enum METSymbolMapper {
         if code.contains("clearsky") || code.contains("clear") {
             return isNight ? "לילה בהיר" : "בהיר"
         }
-        return "מעונן"
+        return "—"
     }
 
     /// SF Symbol icon name for a given normalized icon key.
@@ -83,12 +85,12 @@ public enum METSymbolMapper {
         case "fog": return "cloud.fog.fill"
         case "thunderstorm": return "cloud.bolt.rain.fill"
         case "wind": return "wind"
-        default: return "cloud.fill"
+        default: return "cloud.sun.fill"
         }
     }
 
     /// Maps an icon key and night state to the corresponding WeatherCondition for SwiftUISky.
-    public static func weatherCondition(for iconKey: String, isNight: Bool) -> WeatherCondition {
+    public static func weatherCondition(for iconKey: String, isNight: Bool) -> WeatherCondition? {
         switch iconKey {
         case "thunderstorm":
             return .thunderstorm
@@ -111,11 +113,7 @@ public enum METSymbolMapper {
         case "clear-day":
             return .clearDay
         default:
-            if iconKey.contains("night") || isNight {
-                return .cloudyNight
-            } else {
-                return .partlyCloudyDay
-            }
+            return nil
         }
     }
 }

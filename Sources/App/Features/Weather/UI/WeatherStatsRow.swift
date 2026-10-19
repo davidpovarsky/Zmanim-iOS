@@ -16,24 +16,25 @@ public struct WeatherStatsRow: View {
                 label: "מהירות רוח"
             )
 
-            Spacer()
-
             if let precip = stats.precipText {
+                Spacer()
                 statItem(
                     systemImage: "drop.fill",
                     tint: .blue,
                     value: precip,
                     label: "סיכוי למשקעים"
                 )
-                Spacer()
             }
 
-            statItem(
-                systemImage: "thermometer.medium",
-                tint: .orange,
-                value: stats.feelsLikeText ?? "לא זמין",
-                label: "מרגיש כמו"
-            )
+            if let feelsLike = stats.feelsLikeText {
+                Spacer()
+                statItem(
+                    systemImage: "thermometer.medium",
+                    tint: .orange,
+                    value: feelsLike,
+                    label: "מרגיש כמו"
+                )
+            }
         }
     }
 

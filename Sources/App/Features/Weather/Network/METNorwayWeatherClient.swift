@@ -159,7 +159,7 @@ public actor METNorwayWeatherClient {
             let symbolCode = entry.data.next1Hours?.summary?.symbolCode
                 ?? entry.data.next6Hours?.summary?.symbolCode
                 ?? entry.data.next12Hours?.summary?.symbolCode
-                ?? "cloudy"
+                ?? "unknown"
 
             let precip = entry.data.next1Hours?.details?.probabilityOfPrecipitation
                 ?? entry.data.next6Hours?.details?.probabilityOfPrecipitation

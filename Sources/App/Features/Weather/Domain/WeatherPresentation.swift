@@ -67,12 +67,25 @@ public struct WeatherPresentation: Equatable, Sendable {
         now: Date = Date()
     ) {
         guard !snapshot.hours.isEmpty else { return nil }
-        let current = snapshot.hours.last(where: { $0.time <= now }) ?? snapshot.hours.first!
 
-        let upcoming = snapshot.hours.filter {
-            $0.time >= now.addingTimeInterval(-1800) && $0.time <= now.addingTimeInterval(24 * 3600)
+        // Strictly ensure we have a valid hourly sample around now (within at most 2 hours)
+        guard let current = snapshot.hours.first(where: { abs($0.time.timeIntervalSince(now)) <= 3600 })
+            ?? snapshot.hours.last(where: { $0.time <= now && now.timeIntervalSince($0.time) <= 7200 }) else {
+            return nil
         }
-        let shown = upcoming.isEmpty ? [current] : Array(upcoming.prefix(25))
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+
+        let currentHourStart = calendar.dateInterval(of: .hour, for: now)?.start ?? now.addingTimeInterval(-1800)
+        let upcoming = snapshot.hours
+            .filter { $0.time >= currentHourStart }
+            .sorted { $0.time < $1.time }
+
+        var seen = Set<Date>()
+        let deduped = upcoming.filter { seen.insert($0.time).inserted }
+        let shown = Array(deduped.prefix(24))
+        guard !shown.isEmpty else { return nil }
 
         let curRounded = Int(current.temperatureCelsius.rounded())
         let low = shown.map(\.temperatureCelsius).min() ?? current.temperatureCelsius
@@ -118,11 +131,11 @@ public struct WeatherPresentation: Equatable, Sendable {
         self.stats = Stats(
             windText: windString,
             precipText: precipString,
-            feelsLikeText: "—" // Strictly not fabricated
+            feelsLikeText: nil // Not provided by MET Norway Locationforecast 2.0; do not fabricate
         )
 
         let timeFormatter = DateFormatter()
-        timeFormatter.calendar = Calendar(identifier: .gregorian)
+        timeFormatter.calendar = calendar
         timeFormatter.timeZone = timeZone
         timeFormatter.dateFormat = "HH:mm"
 

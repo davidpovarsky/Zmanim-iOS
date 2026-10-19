@@ -94,4 +94,36 @@ final class WeatherCacheTests: XCTestCase {
         )
         XCTAssertNil(telAviv)
     }
+
+    func testRefreshExpirationExtendsExpiry() async {
+        let cache = WeatherCache()
+        let now = Date()
+
+        let hour = WeatherHour(
+            time: now,
+            temperatureCelsius: 23.0,
+            symbolCode: "clearsky_day",
+            iconKey: "clear-day"
+        )
+        let snapshot = WeatherSnapshot(
+            hours: [hour],
+            retrievedAt: now,
+            locationLatitude: 31.778,
+            locationLongitude: 35.235,
+            expiresAt: now.addingTimeInterval(30)
+        )
+
+        await cache.save(snapshot: snapshot, timeZoneID: "Asia/Jerusalem")
+        let extendedExpiry = now.addingTimeInterval(3600)
+        await cache.refreshExpiration(newExpiresAt: extendedExpiry)
+
+        let queryAt60 = now.addingTimeInterval(60)
+        let retrieved = await cache.getCached(
+            latitude: 31.778,
+            longitude: 35.235,
+            timeZoneID: "Asia/Jerusalem",
+            now: queryAt60
+        )
+        XCTAssertNotNil(retrieved)
+    }
 }
