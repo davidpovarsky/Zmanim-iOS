@@ -33,6 +33,12 @@ public struct ZmanimSkyBackdrop: View {
         self.motionTimeOverride = motionTimeOverride
     }
 
+    private var skyCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        return cal
+    }
+
     public var body: some View {
         if let condition {
             GeometryReader { proxy in
@@ -40,9 +46,6 @@ public struct ZmanimSkyBackdrop: View {
                 let backdropHeight: CGFloat = isLandscape
                     ? max(340, proxy.size.height * 0.70)
                     : min(max(proxy.safeAreaInsets.top + 330, 380), 460)
-
-                var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = timeZone
 
                 SkyBackdrop(
                     date: date,
@@ -55,7 +58,7 @@ public struct ZmanimSkyBackdrop: View {
                     isPaused: isPaused,
                     motionTimeOverride: motionTimeOverride,
                     customHeight: backdropHeight,
-                    calendar: calendar
+                    calendar: skyCalendar
                 )
             }
             .ignoresSafeArea(.all, edges: .top)
