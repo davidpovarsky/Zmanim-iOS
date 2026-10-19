@@ -1,47 +1,115 @@
 import Foundation
 
-struct ZmanItem: Identifiable, Codable, Hashable {
-    let id: String
-    let key: String
-    let hebrewTitle: String
-    let englishTitle: String
-    let icon: String
-    let date: Date
-    init(key: String, hebrewTitle: String, englishTitle: String, icon: String, date: Date) {
-        self.key = key; self.hebrewTitle = hebrewTitle; self.englishTitle = englishTitle; self.icon = icon; self.date = date
+public struct ZmanItem: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let key: String
+    public let hebrewTitle: String
+    public let englishTitle: String
+    public let icon: String
+    public let date: Date
+
+    public init(key: String, hebrewTitle: String, englishTitle: String, icon: String, date: Date) {
+        self.key = key
+        self.hebrewTitle = hebrewTitle
+        self.englishTitle = englishTitle
+        self.icon = icon
+        self.date = date
         self.id = "\(key)-\(Int(date.timeIntervalSince1970))"
     }
 }
 
-struct ZmanDefinition: Hashable { let key: String; let hebrewTitle: String; let englishTitle: String; let icon: String }
-enum LocationMode: String, Codable, CaseIterable, Identifiable { case current, fixed; var id: String { rawValue }; var title: String { self == .current ? "המיקום הנוכחי" : "עיר קבועה" } }
+public struct ZmanDefinition: Hashable, Sendable {
+    public let key: String
+    public let hebrewTitle: String
+    public let englishTitle: String
+    public let icon: String
 
-struct NotificationRule: Identifiable, Codable, Hashable {
-    var id: String; var zmanKey: String; var title: String; var offsetMinutes: Int; var isEnabled: Bool; var customName: String?
-    init(id: String? = nil, zmanKey: String, title: String, offsetMinutes: Int = -15, isEnabled: Bool = false, customName: String? = nil) { self.id=id ?? zmanKey; self.zmanKey=zmanKey; self.title=title; self.offsetMinutes=offsetMinutes; self.isEnabled=isEnabled; self.customName=customName }
-    var displayTitle: String { let s=customName?.trimmingCharacters(in:.whitespacesAndNewlines) ?? ""; return s.isEmpty ? title : s }
+    public init(key: String, hebrewTitle: String, englishTitle: String, icon: String) {
+        self.key = key
+        self.hebrewTitle = hebrewTitle
+        self.englishTitle = englishTitle
+        self.icon = icon
+    }
 }
 
-struct UserSettings: Codable, Hashable {
-    var locationMode: LocationMode = .current; var fixedCity = ""; var shabbatMasterEnabled=false; var holidayMasterEnabled=false
-    var rules: [NotificationRule] = Self.defaultRules
-    static let defaultRules: [NotificationRule] = [
-        .init(zmanKey:"alotHaShachar",title:"עלות השחר"), .init(zmanKey:"misheyakir",title:"משיכיר"), .init(zmanKey:"sunrise",title:"זריחה"),
-        .init(zmanKey:"sofZmanShmaMGA",title:"סוף זמן ק״ש (מג״א)"), .init(zmanKey:"sofZmanShma",title:"סוף זמן ק״ש (גר״א)"), .init(zmanKey:"sofZmanTfilla",title:"סוף זמן תפילה"),
-        .init(zmanKey:"chatzot",title:"חצות היום"), .init(zmanKey:"minchaGedola",title:"מנחה גדולה"), .init(zmanKey:"minchaKetana",title:"מנחה קטנה"), .init(zmanKey:"plagHaMincha",title:"פלג המנחה"),
-        .init(zmanKey:"sunset",title:"שקיעה"), .init(zmanKey:"tzeit7083deg",title:"צאת הכוכבים"), .init(zmanKey:"tzeitRT",title:"צאת הכוכבים (רבנו תם)"), .init(zmanKey:"candleLighting",title:"כניסת שבת")]
+public enum LocationMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case current, fixed
+    public var id: String { rawValue }
+    public var title: String { self == .current ? "המיקום הנוכחי" : "עיר קבועה" }
 }
 
-struct ZmanSnapshot: Codable, Hashable {
-    var cityName: String
-    var timeZoneID: String
-    var latitude: Double
-    var longitude: Double
-    var updatedAt: Date
-    var items: [ZmanItem]
-    var locationSignature: String?
+public struct NotificationRule: Identifiable, Codable, Hashable, Sendable {
+    public var id: String
+    public var zmanKey: String
+    public var title: String
+    public var offsetMinutes: Int
+    public var isEnabled: Bool
+    public var customName: String?
 
-    init(
+    public init(id: String? = nil, zmanKey: String, title: String, offsetMinutes: Int = -15, isEnabled: Bool = false, customName: String? = nil) {
+        self.id = id ?? zmanKey
+        self.zmanKey = zmanKey
+        self.title = title
+        self.offsetMinutes = offsetMinutes
+        self.isEnabled = isEnabled
+        self.customName = customName
+    }
+
+    public var displayTitle: String {
+        let s = customName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return s.isEmpty ? title : s
+    }
+}
+
+public struct UserSettings: Codable, Hashable, Sendable {
+    public var locationMode: LocationMode = .current
+    public var fixedCity = ""
+    public var shabbatMasterEnabled = false
+    public var holidayMasterEnabled = false
+    public var rules: [NotificationRule] = Self.defaultRules
+
+    public init(
+        locationMode: LocationMode = .current,
+        fixedCity: String = "",
+        shabbatMasterEnabled: Bool = false,
+        holidayMasterEnabled: Bool = false,
+        rules: [NotificationRule] = Self.defaultRules
+    ) {
+        self.locationMode = locationMode
+        self.fixedCity = fixedCity
+        self.shabbatMasterEnabled = shabbatMasterEnabled
+        self.holidayMasterEnabled = holidayMasterEnabled
+        self.rules = rules
+    }
+
+    public static let defaultRules: [NotificationRule] = [
+        .init(zmanKey: "alotHaShachar", title: "עלות השחר"),
+        .init(zmanKey: "misheyakir", title: "משיכיר"),
+        .init(zmanKey: "sunrise", title: "זריחה"),
+        .init(zmanKey: "sofZmanShmaMGA", title: "סוף זמן ק״ש (מג״א)"),
+        .init(zmanKey: "sofZmanShma", title: "סוף זמן ק״ש (גר״א)"),
+        .init(zmanKey: "sofZmanTfilla", title: "סוף זמן תפילה"),
+        .init(zmanKey: "chatzot", title: "חצות היום"),
+        .init(zmanKey: "minchaGedola", title: "מנחה גדולה"),
+        .init(zmanKey: "minchaKetana", title: "מנחה קטנה"),
+        .init(zmanKey: "plagHaMincha", title: "פלג המנחה"),
+        .init(zmanKey: "sunset", title: "שקיעה"),
+        .init(zmanKey: "tzeit7083deg", title: "צאת הכוכבים"),
+        .init(zmanKey: "tzeitRT", title: "צאת הכוכבים (רבנו תם)"),
+        .init(zmanKey: "candleLighting", title: "כניסת שבת")
+    ]
+}
+
+public struct ZmanSnapshot: Codable, Hashable, Sendable {
+    public var cityName: String
+    public var timeZoneID: String
+    public var latitude: Double
+    public var longitude: Double
+    public var updatedAt: Date
+    public var items: [ZmanItem]
+    public var locationSignature: String?
+
+    public init(
         cityName: String,
         timeZoneID: String,
         latitude: Double,
@@ -59,5 +127,5 @@ struct ZmanSnapshot: Codable, Hashable {
         self.locationSignature = locationSignature
     }
 
-    var timeZone: TimeZone { TimeZone(identifier: timeZoneID) ?? .current }
+    public var timeZone: TimeZone { TimeZone(identifier: timeZoneID) ?? .current }
 }
