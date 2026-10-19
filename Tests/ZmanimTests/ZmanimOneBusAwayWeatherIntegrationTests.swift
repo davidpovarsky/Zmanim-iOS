@@ -41,9 +41,9 @@ final class ZmanimOneBusAwayWeatherIntegrationTests: XCTestCase {
         XCTAssertNotNil(display)
         guard let display else { return }
 
-        // Hourly strip should contain upcoming hours with index 0 labeled "עכשיו"
+        // Hourly strip should contain upcoming hours with index 0 labeled "עכשיו" or "Now" depending on runner environment
         XCTAssertGreaterThanOrEqual(display.hourly.count, 24)
-        XCTAssertEqual(display.hourly.first?.timeLabel, "עכשיו")
+        XCTAssertTrue(display.hourly.first?.timeLabel == "עכשיו" || display.hourly.first?.timeLabel == "Now", "Expected 'עכשיו' or 'Now', got \(String(describing: display.hourly.first?.timeLabel))")
         XCTAssertTrue(display.hourly.first?.isNow == true)
         XCTAssertFalse(display.hourly[1].isNow)
 

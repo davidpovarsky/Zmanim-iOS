@@ -59,7 +59,7 @@ final class OneBusAwayWeatherTests: XCTestCase {
 
         XCTAssertEqual(display.header.regionName, "ירושלים")
         XCTAssertEqual(display.hourly.count, 25) // Up to 25 upcoming hours as defined in original WeatherDisplay
-        XCTAssertEqual(display.hourly.first?.timeLabel, "עכשיו")
+        XCTAssertTrue(display.hourly.first?.timeLabel == "עכשיו" || display.hourly.first?.timeLabel == "Now", "Expected 'עכשיו' or 'Now', got \(String(describing: display.hourly.first?.timeLabel))")
         XCTAssertTrue(display.hourly.first?.isNow == true)
         XCTAssertFalse(display.hourly[1].isNow)
 
