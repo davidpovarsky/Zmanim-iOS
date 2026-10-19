@@ -32,4 +32,32 @@ struct UserSettings: Codable, Hashable {
         .init(zmanKey:"sunset",title:"שקיעה"), .init(zmanKey:"tzeit7083deg",title:"צאת הכוכבים"), .init(zmanKey:"tzeitRT",title:"צאת הכוכבים (רבנו תם)"), .init(zmanKey:"candleLighting",title:"כניסת שבת")]
 }
 
-struct ZmanSnapshot: Codable, Hashable { var cityName:String; var timeZoneID:String; var latitude:Double; var longitude:Double; var updatedAt:Date; var items:[ZmanItem]; var timeZone:TimeZone { TimeZone(identifier:timeZoneID) ?? .current } }
+struct ZmanSnapshot: Codable, Hashable {
+    var cityName: String
+    var timeZoneID: String
+    var latitude: Double
+    var longitude: Double
+    var updatedAt: Date
+    var items: [ZmanItem]
+    var locationSignature: String?
+
+    init(
+        cityName: String,
+        timeZoneID: String,
+        latitude: Double,
+        longitude: Double,
+        updatedAt: Date,
+        items: [ZmanItem],
+        locationSignature: String? = nil
+    ) {
+        self.cityName = cityName
+        self.timeZoneID = timeZoneID
+        self.latitude = latitude
+        self.longitude = longitude
+        self.updatedAt = updatedAt
+        self.items = items
+        self.locationSignature = locationSignature
+    }
+
+    var timeZone: TimeZone { TimeZone(identifier: timeZoneID) ?? .current }
+}

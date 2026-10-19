@@ -21,11 +21,10 @@ final class AppModel: ObservableObject {
     init() {
         if let snapshot = AppGroupStore.loadSnapshot(), !snapshot.items.isEmpty {
             cityName = snapshot.cityName
-            timeZone = TimeZone(identifier: snapshot.timeZoneID) ?? .current
+            let loadedZone = TimeZone(identifier: snapshot.timeZoneID) ?? .current
+            timeZone = loadedZone
             allItems = snapshot.items
-            var cal = Calendar(identifier: .gregorian)
-            cal.timeZone = timeZone
-            todayItems = snapshot.items.filter { cal.isDate($0.date, inSameDayAs: Date()) }
+            todayItems = ZmanDayResolver.itemsForDay(from: snapshot.items, date: Date(), timeZone: loadedZone)
         }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestMode") {
@@ -112,6 +111,8 @@ final class AppModel: ObservableObject {
             return
         }
 
+        weatherModel.resetForLocationChange()
+
         do {
             let resolved = try await locationService.resolve(city: query)
             await load(
@@ -131,8 +132,14 @@ final class AppModel: ObservableObject {
         preferredTimeZone: TimeZone? = nil,
         force: Bool = false
     ) async {
-        if !force, let currentLocation, currentLocation.distance(from: location) < 100, !todayItems.isEmpty {
-            return
+        if !force, let currentLocation, currentLocation.distance(from: location) < 100 {
+            var cal = Calendar(identifier: .gregorian)
+            let checkZone = preferredTimeZone ?? timeZone
+            cal.timeZone = checkZone
+            let isCurrentDay = todayItems.first.map { cal.isDate($0.date, inSameDayAs: Date()) } ?? false
+            if isCurrentDay && !todayItems.isEmpty {
+                return
+            }
         }
 
         isLoading = true
@@ -149,9 +156,7 @@ final class AppModel: ObservableObject {
             allItems = items
             currentLocation = location
 
-            var cal = Calendar(identifier: .gregorian)
-            cal.timeZone = zone
-            todayItems = items.filter { cal.isDate($0.date, inSameDayAs: Date()) }
+            todayItems = ZmanDayResolver.itemsForDay(from: items, date: Date(), timeZone: zone)
 
             AppGroupStore.saveSnapshot(.init(
                 cityName: city,
@@ -159,18 +164,21 @@ final class AppModel: ObservableObject {
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
                 updatedAt: Date(),
-                items: items
+                items: items,
+                locationSignature: city
             ))
             WidgetCenter.shared.reloadAllTimelines()
             await NotificationScheduler.rescheduleIfAuthorized(settings: settings, items: allItems, timeZone: zone)
 
-            // Update weather asynchronously without blocking zmanim
-            let rise = todayItems.first { $0.key == "sunrise" }?.date
-            let set = todayItems.first { $0.key == "sunset" }?.date
+            // Update weather asynchronously with genuine MET Norway data
+            let rise = ZmanDayResolver.sunrise(from: todayItems, date: Date(), timeZone: zone)
+            let set = ZmanDayResolver.sunset(from: todayItems, date: Date(), timeZone: zone)
             let coord = location.coordinate
             Task {
                 await weatherModel.update(
                     location: coord,
+                    cityName: city,
+                    timeZone: zone,
                     now: Date(),
                     sunrise: rise,
                     sunset: set,
@@ -182,9 +190,53 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Handles midnight rollover or date transitions in the active time zone.
+    public func checkDayRollover(now: Date = Date()) {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+
+        let currentDayItems = ZmanDayResolver.itemsForDay(from: allItems, date: now, timeZone: timeZone)
+
+        let isTodayCurrent: Bool
+        if let firstToday = todayItems.first {
+            isTodayCurrent = cal.isDate(firstToday.date, inSameDayAs: now)
+        } else {
+            isTodayCurrent = false
+        }
+
+        if !isTodayCurrent || todayItems.count != currentDayItems.count {
+            todayItems = currentDayItems
+
+            let futureCount = allItems.filter { $0.date > now }.count
+            if futureCount < 15, let currentLocation {
+                Task {
+                    await load(location: currentLocation, preferredCity: cityName, preferredTimeZone: timeZone, force: true)
+                }
+            } else {
+                WidgetCenter.shared.reloadAllTimelines()
+                let rise = ZmanDayResolver.sunrise(from: todayItems, date: now, timeZone: timeZone)
+                let set = ZmanDayResolver.sunset(from: todayItems, date: now, timeZone: timeZone)
+                if let loc = currentLocation?.coordinate {
+                    Task {
+                        await weatherModel.update(
+                            location: loc,
+                            cityName: cityName,
+                            timeZone: timeZone,
+                            now: now,
+                            sunrise: rise,
+                            sunset: set,
+                            force: false
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     public func saveSettings() async {
         AppGroupStore.saveSettings(settings)
         if settings.locationMode == .fixed {
+            weatherModel.resetForLocationChange()
             await refreshFixedCity()
         } else if let currentLocation {
             await load(location: currentLocation, force: true)

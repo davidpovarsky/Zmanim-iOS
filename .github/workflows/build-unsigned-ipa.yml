@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/runtime-widget-notification-validation
+      - feature/met-weather-widget-paging-eod
   workflow_dispatch:
 
 permissions:

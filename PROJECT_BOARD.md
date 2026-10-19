@@ -22,6 +22,10 @@ Useful technical discoveries, undocumented behavior, shortcuts, implementation t
 - **Notification Content Extension Framework Linking**: When defining a `UNNotificationContentExtension` target via XcodeGen, `UserNotificationsUI.framework` must be explicitly declared under `dependencies: [sdk: UserNotificationsUI.framework]` and `-framework UserNotificationsUI` linker flags. Without this, the linker omits the extension point symbols; `ExtensionFoundation` then aborts at runtime with `Unable to find NSExtensionContextClass (_UNNotificationContentExtensionVendorContext) in extension bundle - did you link the framework that declares the extension point?` with SIGTRAP, causing SpringBoard to fall back to an empty blank white view.
 - **XCUIApplication State During SpringBoard Dismissals**: When SpringBoard displays an expanded notification overlay or handles an action button, the host app process transitions through suspended states while SpringBoard animates dismissal. Immediate synchronous checks on `app.state == .runningForeground` fail transiently during animation; `app.wait(for: .runningForeground, timeout:)` or asserting `app.state != .notRunning` accurately confirms host process survival and foreground resumption.
 
+- **MET Norway Symbol Mapping Precedence**: Symbol codes containing `snowshowers` (e.g. `snowshowers_day`) also match substring `showers`. If `showers` or `rain` is matched first, snow showers are misclassified as rain. Strictly prioritizing snow/sleet condition checks before generic showers/rain ensures accurate precipitation rendering in both the forecast card and `SwiftUISky`.
+- **WidgetKit Interactive Paging Expiration & Timeline Entries**: When paging widgets with `AppIntent` without opening the host app, WidgetKit reloads timelines asynchronously. Pairing `expiresAt = now + 60s` in the App Group with a future timeline entry at `expiresAt` (page 0) allows best-effort automatic return to the initial page while respecting WidgetKit energy budgets.
+- **End-of-Day Next Zman Resolver**: Filtering only `todayItems.first(where: { $0.date > now })` causes false "loading" states after the last daily zman. Sourcing upcoming events from multi-day Hebcal data and tagging events on subsequent local days with a "מחר" indicator provides continuous, truthful display without unneeded network requests.
+
 ## Experiments / Investigations
 
 Things worth testing or researching before deciding whether to implement them.
@@ -42,12 +46,10 @@ Use Markdown checkboxes where useful:
 
 Completed items that are still useful to retain because they document an important decision, discovery, or implementation.
 
-Example:
-
-- [x] Example improvement
-  - Implemented: YYYY-MM-DD
-  - Commit/PR: ...
-  - Notes: ...
+- [x] Master Implementation: MET Norway, No-Fake Weather, Widget 5-Item Paging, End-of-Day Next Zman, and SwiftUISky TimeZone Support
+  - Implemented: 2026-10-19
+  - Branch: `feature/met-weather-widget-paging-eod`
+  - Notes: Full end-to-end execution of prompt specifications A–I. Replaced Open-Meteo with MET Norway compact client; removed `fallbackReport`; implemented `WeatherDetailPopup` and `WeatherHeaderButton` in the exact top-left marked location; partitioned widget day items into stable 5-item pages with `chevron.down`/`chevron.up` App Intents and 60s best-effort reversion; resolved end-of-day next zman with "מחר" tag; passed city time zone to `SkyBackdrop`; added comprehensive unit test suites for all pure logic domain models.
 
 ## Archive
 

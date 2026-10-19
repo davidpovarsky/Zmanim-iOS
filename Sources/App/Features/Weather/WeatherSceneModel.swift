@@ -2,67 +2,198 @@ import Combine
 import CoreLocation
 import Foundation
 import SwiftUI
+import os
 
 @MainActor
-final class WeatherSceneModel: ObservableObject {
-    @Published var condition: WeatherCondition = .clearDay
-    @Published var cloudCover: Double = 0.20
-    @Published var isDay: Bool = true
-    @Published var lastUpdated: Date?
-    @Published var previewOverride: WeatherScenePreview?
+public final class WeatherSceneModel: ObservableObject {
+    private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim", category: "WeatherSceneModel")
 
-    private var currentLocation: CLLocationCoordinate2D?
-    private var lastFetchTime: Date?
+    @Published public var isAvailable: Bool = false
+    @Published public var condition: WeatherCondition? = nil
+    @Published public var cloudCover: Double = 0.0
+    @Published public var currentSnapshot: WeatherSnapshot? = nil
+    @Published public var presentation: WeatherPresentation? = nil
+    @Published public var lastUpdated: Date? = nil
+    @Published public var isFetching: Bool = false
+    @Published public var previewOverride: WeatherScenePreview? = nil
 
-    init() {}
+    private var currentCoordinate: CLLocationCoordinate2D?
+    private var currentCityName: String = ""
 
-    public func update(
-        location: CLLocationCoordinate2D,
-        now: Date,
-        sunrise: Date?,
-        sunset: Date?,
-        force: Bool = false
-    ) async {
-        if let preview = previewOverride {
-            applyPreview(preview, now: now, sunrise: sunrise, sunset: sunset)
-            return
-        }
-
-        currentLocation = location
-        let report = await WeatherService.shared.fetchWeather(for: location, force: force)
-
-        let resolved = WeatherCondition.resolve(
-            wmoCode: report.weatherCode,
-            isDay: report.isDay,
-            cloudCoverPercent: report.cloudCover,
-            now: now,
-            sunrise: sunrise,
-            sunset: sunset
-        )
-
-        self.condition = resolved
-        self.cloudCover = Double(report.cloudCover) / 100.0
-        self.isDay = report.isDay
-        self.lastUpdated = report.fetchedAt
+    public init() {
+        // Starts strictly unavailable with no fabricated weather data
+        self.isAvailable = false
+        self.condition = nil
+        self.cloudCover = 0.0
+        self.currentSnapshot = nil
+        self.presentation = nil
     }
 
+    /// Updates the weather state strictly using genuine MET Norway data or cached snapshot.
+    public func update(
+        location: CLLocationCoordinate2D,
+        cityName: String,
+        timeZone: TimeZone,
+        now: Date = Date(),
+        sunrise: Date? = nil,
+        sunset: Date? = nil,
+        force: Bool = false
+    ) async {
+        self.currentCoordinate = location
+        self.currentCityName = cityName
+
+        #if DEBUG
+        if let preview = previewOverride {
+            applyPreview(preview, cityName: cityName, timeZone: timeZone, now: now, sunrise: sunrise, sunset: sunset)
+            return
+        }
+        #endif
+
+        isFetching = true
+        defer { isFetching = false }
+
+        do {
+            let snapshot = try await METNorwayWeatherClient.shared.fetchForecast(
+                latitude: location.latitude,
+                longitude: location.longitude,
+                timeZone: timeZone,
+                force: force
+            )
+
+            guard let pres = WeatherPresentation(
+                snapshot: snapshot,
+                cityName: cityName,
+                timeZone: timeZone,
+                now: now
+            ) else {
+                throw METWeatherError.emptyData
+            }
+
+            let currentHour = snapshot.hours.last(where: { $0.time <= now }) ?? snapshot.hours.first
+
+            // Determine day/night relative to actual Halachic sunrise/sunset
+            let isNight: Bool
+            if let sunrise, let sunset, sunset > sunrise {
+                isNight = now < sunrise || now > sunset
+            } else {
+                let hour = Calendar.current.component(.hour, from: now)
+                isNight = hour < 6 || hour >= 19
+            }
+
+            let iconKey = currentHour?.iconKey ?? "cloudy"
+            var resolvedCondition = METSymbolMapper.weatherCondition(for: iconKey, isNight: isNight)
+
+            // Severe/precipitation conditions take precedence over twilight
+            let isPrecipOrSevere = ["thunderstorm", "snow", "sleet", "rain", "fog"].contains(iconKey)
+            if !isPrecipOrSevere {
+                let twilightWindow: TimeInterval = 45 * 60
+                if let sunrise, abs(now.timeIntervalSince(sunrise)) <= twilightWindow {
+                    resolvedCondition = .sunrise
+                } else if let sunset, abs(now.timeIntervalSince(sunset)) <= twilightWindow {
+                    resolvedCondition = .sunset
+                }
+            }
+
+            let clouds = (currentHour?.cloudAreaFractionPercent ?? 20.0) / 100.0
+
+            self.currentSnapshot = snapshot
+            self.presentation = pres
+            self.condition = resolvedCondition
+            self.cloudCover = clouds
+            self.lastUpdated = snapshot.retrievedAt
+            self.isAvailable = true
+        } catch {
+            Self.logger.warning("Weather fetch failed: \(error.localizedDescription, privacy: .public)")
+            // If there's an existing valid snapshot, retain it; otherwise reset to unavailable
+            if let existing = currentSnapshot,
+               let pres = WeatherPresentation(snapshot: existing, cityName: cityName, timeZone: timeZone, now: now) {
+                self.presentation = pres
+                self.isAvailable = true
+            } else {
+                self.currentSnapshot = nil
+                self.presentation = nil
+                self.condition = nil
+                self.cloudCover = 0.0
+                self.isAvailable = false
+            }
+        }
+    }
+
+    /// Resets the model when changing locations or cities.
+    public func resetForLocationChange() {
+        self.currentSnapshot = nil
+        self.presentation = nil
+        self.condition = nil
+        self.cloudCover = 0.0
+        self.isAvailable = false
+        Task {
+            await WeatherCache.shared.clear()
+        }
+    }
+
+    #if DEBUG
     public func setPreview(_ preview: WeatherScenePreview?) {
         self.previewOverride = preview
+        if let preview {
+            applyPreview(
+                preview,
+                cityName: currentCityName.isEmpty ? "ירושלים" : currentCityName,
+                timeZone: .current,
+                now: Date(),
+                sunrise: nil,
+                sunset: nil
+            )
+        } else {
+            self.previewOverride = nil
+            self.isAvailable = false
+            self.condition = nil
+            self.cloudCover = 0.0
+            self.presentation = nil
+        }
     }
 
     private func applyPreview(
         _ preview: WeatherScenePreview,
+        cityName: String,
+        timeZone: TimeZone,
         now: Date,
         sunrise: Date?,
         sunset: Date?
     ) {
+        self.isAvailable = true
         self.condition = preview.condition
         self.cloudCover = preview.cloudCover
-        self.isDay = preview.isDay
         self.lastUpdated = now
+
+        let mockHour = WeatherHour(
+            time: now,
+            temperatureCelsius: 22.0,
+            windMetersPerSecond: 3.5,
+            precipitationChancePercent: preview == .rain ? 80.0 : (preview == .snow ? 70.0 : 0.0),
+            cloudAreaFractionPercent: preview.cloudCover * 100.0,
+            symbolCode: preview.symbolCode,
+            iconKey: preview.iconKey
+        )
+
+        let mockSnapshot = WeatherSnapshot(
+            hours: [mockHour],
+            retrievedAt: now,
+            locationLatitude: 31.778,
+            locationLongitude: 35.235
+        )
+
+        self.currentSnapshot = mockSnapshot
+        self.presentation = WeatherPresentation(
+            snapshot: mockSnapshot,
+            cityName: cityName,
+            timeZone: timeZone,
+            now: now
+        )
     }
+    #endif
 }
 
+#if DEBUG
 public enum WeatherScenePreview: String, CaseIterable, Identifiable {
     case clearMorning = "בוקר בהיר"
     case middaySun = "צהריים שטופי שמש"
@@ -79,12 +210,10 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
 
     public var condition: WeatherCondition {
         switch self {
-        case .clearMorning: return .clearDay
-        case .middaySun: return .clearDay
+        case .clearMorning, .middaySun: return .clearDay
         case .partlyCloudyAfternoon: return .partlyCloudyDay
         case .overcastAfternoon: return .overcastDay
-        case .goldenSunset: return .sunset
-        case .twilight: return .sunset
+        case .goldenSunset, .twilight: return .sunset
         case .clearNight: return .clearNight
         case .rain: return .rain
         case .snow: return .snow
@@ -104,11 +233,21 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
         }
     }
 
-    public var isDay: Bool {
+    public var symbolCode: String {
         switch self {
-        case .clearNight: return false
-        default: return true
+        case .clearMorning, .middaySun: return "clearsky_day"
+        case .partlyCloudyAfternoon: return "partlycloudy_day"
+        case .overcastAfternoon: return "cloudy"
+        case .goldenSunset, .twilight: return "fair_day"
+        case .clearNight: return "clearsky_night"
+        case .rain: return "rain"
+        case .snow: return "snow"
+        case .fog: return "fog"
         }
+    }
+
+    public var iconKey: String {
+        METSymbolMapper.iconKey(from: symbolCode)
     }
 
     public func simulatedDate(for baseDate: Date, sunrise: Date?, sunset: Date?) -> Date {
@@ -141,3 +280,4 @@ public enum WeatherScenePreview: String, CaseIterable, Identifiable {
         return calendar.date(from: comps) ?? baseDate
     }
 }
+#endif

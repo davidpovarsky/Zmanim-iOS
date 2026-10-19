@@ -9,14 +9,19 @@ struct ZmanProvider: TimelineProvider {
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim.Widgets", category: "ZmanProvider")
 
     func placeholder(in context: Context) -> ZmanEntry {
-        ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil)
+        ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil, pageIndex: 0, pageCount: 1)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ZmanEntry) -> Void) {
         if let cached = AppGroupStore.loadSnapshot(), !cached.items.isEmpty {
-            completion(ZmanEntry(date: .now, snapshot: cached, state: nil))
+            let selector = WidgetDaySelector(
+                allItems: cached.items,
+                referenceDate: .now,
+                timeZone: cached.timeZone
+            )
+            completion(ZmanEntry(date: .now, snapshot: cached, state: nil, pageIndex: 0, pageCount: selector.pageCount))
         } else {
-            completion(ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil))
+            completion(ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil, pageIndex: 0, pageCount: 1))
         }
     }
 
@@ -24,17 +29,33 @@ struct ZmanProvider: TimelineProvider {
         Task { @MainActor in
             let now = Date()
             let cached = AppGroupStore.loadSnapshot()
+            let settings = AppGroupStore.loadSettings()
+            let pageState = WidgetPageStateStore.loadState()
 
-            // 1. Fast path: fresh valid snapshot from today
+            // 1. Fixed city mode: strictly use shared snapshot without invoking GPS
+            if settings.locationMode == .fixed && !settings.fixedCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let cached, !cached.items.isEmpty {
+                    let stateNote = isSnapshotFresh(cached, now: now) ? nil : formatStaleNote(for: cached)
+                    completion(makeTimeline(snapshot: cached, now: now, state: stateNote, pageState: pageState))
+                    return
+                } else {
+                    let recovery = "פתח את האפליקציה לרענון \(settings.fixedCity)"
+                    let entry = ZmanEntry(date: now, snapshot: nil, state: recovery, pageIndex: 0, pageCount: 1)
+                    completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300))))
+                    return
+                }
+            }
+
+            // 2. Current GPS location mode: fast path with fresh snapshot
             if let cached, isSnapshotFresh(cached, now: now) {
                 #if DEBUG
                 Self.logger.debug("Using fresh App Group snapshot (\(cached.items.count) items)")
                 #endif
-                completion(makeTimeline(snapshot: cached, now: now, state: nil))
+                completion(makeTimeline(snapshot: cached, now: now, state: nil, pageState: pageState))
                 return
             }
 
-            // 2. Refresh path: missing, stale, or different-day snapshot
+            // 3. Refresh path: missing or stale snapshot with GPS authorization
             let fetcher = WidgetLocationFetcher()
             let state = fetcher.currentState
 
@@ -59,14 +80,14 @@ struct ZmanProvider: TimelineProvider {
                                 latitude: location.coordinate.latitude,
                                 longitude: location.coordinate.longitude,
                                 updatedAt: now,
-                                items: items
+                                items: items,
+                                locationSignature: "current"
                             )
-                            // Best-effort cache save (does not fail if App Group is unavailable)
                             AppGroupStore.saveSnapshot(snapshot)
                             #if DEBUG
                             Self.logger.notice("Widget successfully fetched \(items.count) zmanim from Hebcal")
                             #endif
-                            completion(makeTimeline(snapshot: snapshot, now: now, state: nil))
+                            completion(makeTimeline(snapshot: snapshot, now: now, state: nil, pageState: pageState))
                             return
                         }
                     } catch {
@@ -77,21 +98,17 @@ struct ZmanProvider: TimelineProvider {
                 }
             }
 
-            // 3. Fallback strategy:
-            // If stale cache exists, display stale cache with update note
+            // 4. Stale cache fallback
             if let cached, !cached.items.isEmpty {
                 #if DEBUG
                 Self.logger.notice("Displaying stale cache as fallback")
                 #endif
-                let formatter = DateFormatter()
-                formatter.dateFormat = "HH:mm"
-                formatter.timeZone = cached.timeZone
-                let timeStr = formatter.string(from: cached.updatedAt)
-                completion(makeTimeline(snapshot: cached, now: now, state: "עודכן ב-\(timeStr)"))
+                let note = formatStaleNote(for: cached)
+                completion(makeTimeline(snapshot: cached, now: now, state: note, pageState: pageState))
                 return
             }
 
-            // 4. No cache and no fresh data: display clear explanatory state
+            // 5. No cache and no data: show recovery state (never demo Jerusalem)
             let recoveryMessage: String
             switch state {
             case .appAuthorizedWidgetDenied:
@@ -107,58 +124,112 @@ struct ZmanProvider: TimelineProvider {
             #if DEBUG
             Self.logger.notice("Displaying empty recovery state: \(recoveryMessage, privacy: .public)")
             #endif
-            let entry = ZmanEntry(date: now, snapshot: nil, state: recoveryMessage)
+            let entry = ZmanEntry(date: now, snapshot: nil, state: recoveryMessage, pageIndex: 0, pageCount: 1)
             completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300))))
         }
+    }
+
+    private func formatStaleNote(for snapshot: ZmanSnapshot) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = snapshot.timeZone
+        return "עודכן ב-\(formatter.string(from: snapshot.updatedAt))"
     }
 
     private func isSnapshotFresh(_ snapshot: ZmanSnapshot, now: Date) -> Bool {
         guard !snapshot.items.isEmpty else { return false }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = snapshot.timeZone
-        // Snapshot is considered fresh if it was updated today and has upcoming items or is recent
         let isToday = cal.isDate(snapshot.updatedAt, inSameDayAs: now)
         let hasUpcoming = snapshot.items.contains(where: { $0.date > now })
         return isToday && hasUpcoming
     }
 
-    private func makeTimeline(snapshot: ZmanSnapshot, now: Date, state: String?) -> Timeline<ZmanEntry> {
+    private func makeTimeline(
+        snapshot: ZmanSnapshot,
+        now: Date,
+        state: String?,
+        pageState: WidgetPageState?
+    ) -> Timeline<ZmanEntry> {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = snapshot.timeZone
 
-        // Create entries for now and at upcoming zmanim transitions today
-        var dates: [Date] = [now]
-        let upcomingItems = snapshot.items.filter { $0.date > now }
+        let dayKey = WidgetPageStateStore.dayKey(for: now, timeZone: snapshot.timeZone)
+        let selector = WidgetDaySelector(
+            allItems: snapshot.items,
+            referenceDate: now,
+            timeZone: snapshot.timeZone
+        )
 
+        let effectivePage = WidgetPageStateStore.effectivePageIndex(
+            state: pageState,
+            currentDate: now,
+            currentDayKey: dayKey,
+            currentLocationFingerprint: snapshot.cityName,
+            pageCount: selector.pageCount
+        )
+
+        var timePoints: [(date: Date, page: Int)] = [(now, effectivePage)]
+
+        // Future entry for 60-second best-effort page reset
+        if effectivePage > 0, let expiresAt = pageState?.expiresAt, expiresAt > now {
+            timePoints.append((expiresAt, 0))
+        }
+
+        // Add entries for upcoming zmanim transitions today
+        let upcomingItems = snapshot.items.filter { $0.date > now }
         for item in upcomingItems {
-            dates.append(item.date)
+            let pageForTransition: Int
+            if effectivePage > 0, let expiresAt = pageState?.expiresAt, item.date < expiresAt {
+                pageForTransition = effectivePage
+            } else {
+                pageForTransition = 0
+            }
+            timePoints.append((item.date, pageForTransition))
         }
 
         // Add midnight rollover entry
         if let nextMidnight = cal.nextDate(after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime) {
-            dates.append(nextMidnight)
+            timePoints.append((nextMidnight, 0))
         }
 
-        dates.sort()
-        // Deduplicate timestamps within 10 seconds of each other
-        var uniqueDates: [Date] = []
-        for d in dates {
-            if let last = uniqueDates.last {
-                if d.timeIntervalSince(last) >= 10 {
-                    uniqueDates.append(d)
+        timePoints.sort { $0.date < $1.date }
+
+        // Deduplicate timestamps within 10 seconds
+        var uniquePoints: [(date: Date, page: Int)] = []
+        for pt in timePoints {
+            if let last = uniquePoints.last {
+                if pt.date.timeIntervalSince(last.date) >= 10 {
+                    uniquePoints.append(pt)
                 }
             } else {
-                uniqueDates.append(d)
+                uniquePoints.append(pt)
             }
         }
 
-        let entries = uniqueDates.map { ZmanEntry(date: $0, snapshot: snapshot, state: state) }
+        let entries = uniquePoints.map { pt in
+            ZmanEntry(
+                date: pt.date,
+                snapshot: snapshot,
+                state: state,
+                pageIndex: pt.page,
+                pageCount: selector.pageCount,
+                expiresAt: pageState?.expiresAt
+            )
+        }
 
-        // Refresh at the next day rollover or in at most 4 hours
+        // Refresh policy: if paged, schedule reload at expiresAt (best effort 60s); otherwise next midnight or max 4h
         let nextMidnight = cal.nextDate(after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime)
-        let refreshDate = min(nextMidnight ?? now.addingTimeInterval(14400), now.addingTimeInterval(14400))
+        let defaultRefresh = min(nextMidnight ?? now.addingTimeInterval(14400), now.addingTimeInterval(14400))
 
-        return Timeline(entries: entries, policy: .after(refreshDate))
+        let reloadPolicy: TimelineReloadPolicy
+        if effectivePage > 0, let expiresAt = pageState?.expiresAt, expiresAt > now {
+            reloadPolicy = .after(expiresAt)
+        } else {
+            reloadPolicy = .after(defaultRefresh)
+        }
+
+        return Timeline(entries: entries, policy: reloadPolicy)
     }
 
     private var demoSnapshot: ZmanSnapshot {
@@ -170,11 +241,13 @@ struct ZmanProvider: TimelineProvider {
             longitude: 35.235,
             updatedAt: now,
             items: [
+                ZmanItem(key: "alotHaShachar", hebrewTitle: "עלות השחר", englishTitle: "Alot HaShachar", icon: "moon.stars.fill", date: now.addingTimeInterval(-10800)),
                 ZmanItem(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Sunrise", icon: "sunrise.fill", date: now.addingTimeInterval(-7200)),
                 ZmanItem(key: "chatzot", hebrewTitle: "חצות היום", englishTitle: "Chatzot", icon: "sun.max.fill", date: now.addingTimeInterval(3600)),
                 ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: now.addingTimeInterval(7200)),
                 ZmanItem(key: "tzeit7083deg", hebrewTitle: "צאת הכוכבים", englishTitle: "Tzeit", icon: "moon.fill", date: now.addingTimeInterval(9000))
-            ]
+            ],
+            locationSignature: "demo"
         )
     }
 }
@@ -187,7 +260,7 @@ struct ZmanimWidget: Widget {
                 .containerBackground(Color(red: 0.972, green: 0.966, blue: 0.936), for: .widget)
         }
         .configurationDisplayName("זמני היום")
-        .description("הזמן הבא ומסלול השמש.")
+        .description("הזמן הבא, מסלול השמש ודפדוף זמני היום.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
 }

@@ -1,28 +1,46 @@
 import SwiftUI
 import WidgetKit
 
-struct ZmanEntry: TimelineEntry {
-    let date: Date
-    let snapshot: ZmanSnapshot?
-    let state: String?
+public struct ZmanEntry: TimelineEntry, Sendable {
+    public let date: Date
+    public let snapshot: ZmanSnapshot?
+    public let state: String?
+    public let pageIndex: Int
+    public let pageCount: Int
+    public let expiresAt: Date?
 
-    init(date: Date, snapshot: ZmanSnapshot?, state: String?) {
+    public init(
+        date: Date,
+        snapshot: ZmanSnapshot?,
+        state: String?,
+        pageIndex: Int = 0,
+        pageCount: Int = 1,
+        expiresAt: Date? = nil
+    ) {
         self.date = date
         self.snapshot = snapshot
         self.state = state
+        self.pageIndex = pageIndex
+        self.pageCount = pageCount
+        self.expiresAt = expiresAt
     }
 
-    var next: ZmanItem? {
-        snapshot?.items.first(where: { $0.date > date })
+    public var next: ZmanItem? {
+        guard let snapshot else { return nil }
+        return NextZmanResolver.resolve(
+            allItems: snapshot.items,
+            now: date,
+            timeZone: snapshot.timeZone
+        )?.item
     }
 }
 
-struct ZmanWidgetView: View {
+public struct ZmanWidgetView: View {
     @Environment(\.widgetFamily) private var envFamily
-    let entry: ZmanEntry
-    var explicitFamily: WidgetFamily? = nil
+    public let entry: ZmanEntry
+    public var explicitFamily: WidgetFamily? = nil
 
-    init(entry: ZmanEntry, explicitFamily: WidgetFamily? = nil) {
+    public init(entry: ZmanEntry, explicitFamily: WidgetFamily? = nil) {
         self.entry = entry
         self.explicitFamily = explicitFamily
     }
@@ -31,7 +49,7 @@ struct ZmanWidgetView: View {
         explicitFamily ?? envFamily
     }
 
-    var body: some View {
+    public var body: some View {
         switch activeFamily {
         case .accessoryInline:
             Text(inlineText)
@@ -53,7 +71,7 @@ struct ZmanWidgetView: View {
         }
     }
 
-    var small: some View {
+    private var small: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("זמני היום").font(.headline)
@@ -70,7 +88,7 @@ struct ZmanWidgetView: View {
                 Text(state).font(.caption).foregroundStyle(.secondary)
                 Text(nextTime).font(.title2.monospacedDigit())
             } else {
-                Text("טוען…").font(.headline)
+                Text("אין נתונים").font(.headline)
                 Text("--:--").font(.title.monospacedDigit())
             }
             Spacer()
@@ -85,7 +103,7 @@ struct ZmanWidgetView: View {
         }
     }
 
-    var medium: some View {
+    private var medium: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.snapshot?.cityName ?? "זמני היום").font(.caption).foregroundStyle(.secondary)
@@ -94,7 +112,7 @@ struct ZmanWidgetView: View {
                     Text(nextTime).font(.title.monospacedDigit().bold())
                     Text(next.date, style: .relative).font(.caption).foregroundStyle(.orange)
                 } else {
-                    Text(entry.state ?? "טוען…").font(.title3.bold())
+                    Text(entry.state ?? "אין נתונים").font(.title3.bold())
                     Text(nextTime).font(.title.monospacedDigit().bold())
                 }
             }
@@ -108,33 +126,81 @@ struct ZmanWidgetView: View {
         }
     }
 
-    var large: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var large: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("זמני היום").font(.title2.bold())
                 Spacer()
                 Text(entry.snapshot?.cityName ?? "").foregroundStyle(.secondary)
             }
+
             if let snapshot = entry.snapshot {
-                SolarMini(snapshot: snapshot, now: entry.date).frame(height: 90)
-                let upcoming = snapshot.items.filter { $0.date > entry.date }
-                let itemsToShow = upcoming.isEmpty ? Array(snapshot.items.suffix(5)) : Array(upcoming.prefix(5))
-                ForEach(itemsToShow) { item in
-                    HStack {
-                        Image(systemName: item.icon).frame(width: 25)
-                        Text(item.hebrewTitle)
-                        Spacer()
-                        Text(time(item.date)).monospacedDigit()
+                SolarMini(snapshot: snapshot, now: entry.date).frame(height: 85)
+
+                let selector = WidgetDaySelector(
+                    allItems: snapshot.items,
+                    referenceDate: entry.date,
+                    timeZone: snapshot.timeZone
+                )
+                let itemsToShow = selector.items(for: entry.pageIndex)
+
+                VStack(spacing: 6) {
+                    ForEach(itemsToShow) { item in
+                        HStack {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 15))
+                                .frame(width: 25)
+                                .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
+                            Text(item.hebrewTitle)
+                                .font(.subheadline)
+                                .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
+                            Spacer()
+                            Text(time(item.date))
+                                .monospacedDigit()
+                                .font(.subheadline.bold())
+                                .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
+                        }
                     }
-                    .font(.subheadline)
+                }
+
+                Spacer(minLength: 4)
+
+                // Interactive paging controls (chevron down / chevron up) as marked in reference image
+                if selector.pageCount > 1 {
+                    HStack {
+                        Spacer()
+                        if entry.pageIndex > 0 {
+                            Button(intent: PreviousWidgetPageIntent()) {
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Color.secondary)
+                                    .frame(width: 44, height: 28)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("חזור לחמשת הזמנים הקודמים")
+                        }
+
+                        Button(intent: NextWidgetPageIntent()) {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.secondary)
+                                .frame(width: 44, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("עבור לחמשת הזמנים הבאים")
+
+                        Spacer()
+                    }
                 }
             } else {
-                ContentUnavailableView("אין עדיין נתונים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
+                ContentUnavailableView("אין נתוני זמנים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
             }
+
             if let state = entry.state, entry.snapshot != nil {
                 Text(state).font(.caption2).foregroundStyle(.secondary)
             }
-            Spacer()
         }
     }
 
@@ -143,29 +209,32 @@ struct ZmanWidgetView: View {
 
     private func time(_ date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = entry.snapshot?.timeZone ?? .current
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
 
     private var progress: Double {
-        guard let sunrise = entry.snapshot?.items.first(where: { $0.key == "sunrise" })?.date,
-              let sunset = entry.snapshot?.items.first(where: { $0.key == "sunset" })?.date,
+        guard let snapshot = entry.snapshot else { return 0 }
+        let tz = snapshot.timeZone
+        guard let sunrise = ZmanDayResolver.sunrise(from: snapshot.items, date: entry.date, timeZone: tz),
+              let sunset = ZmanDayResolver.sunset(from: snapshot.items, date: entry.date, timeZone: tz),
               sunset > sunrise else { return 0 }
         return min(max(entry.date.timeIntervalSince(sunrise) / sunset.timeIntervalSince(sunrise), 0), 1)
     }
 }
 
-struct SolarMini: View {
-    let snapshot: ZmanSnapshot?
-    let now: Date
+public struct SolarMini: View {
+    public let snapshot: ZmanSnapshot?
+    public let now: Date
 
-    init(snapshot: ZmanSnapshot?, now: Date) {
+    public init(snapshot: ZmanSnapshot?, now: Date) {
         self.snapshot = snapshot
         self.now = now
     }
 
-    var body: some View {
+    public var body: some View {
         GeometryReader { geometry in
             let arc = SolarArcGeometry(
                 size: geometry.size,
@@ -206,8 +275,12 @@ struct SolarMini: View {
     }
 
     private var progress: Double {
-        guard let sunrise = snapshot?.items.first(where: { $0.key == "sunrise" })?.date,
-              let sunset = snapshot?.items.first(where: { $0.key == "sunset" })?.date else { return 0 }
+        guard let snapshot else { return 0 }
+        let tz = snapshot.timeZone
+        guard let sunrise = ZmanDayResolver.sunrise(from: snapshot.items, date: now, timeZone: tz),
+              let sunset = ZmanDayResolver.sunset(from: snapshot.items, date: now, timeZone: tz) else {
+            return 0
+        }
         return SolarArcGeometry.progress(now: now, sunrise: sunrise, sunset: sunset)
     }
 }
