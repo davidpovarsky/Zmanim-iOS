@@ -23,7 +23,7 @@ final class LocationDisplayLocalizationTests: XCTestCase {
         )
 
         XCTAssertTrue(entryWithoutLocality.isGPS)
-        XCTAssertTrue(entryWithoutLocality.snapshot.cityName.isEmpty)
+        XCTAssertEqual(entryWithoutLocality.snapshot?.cityName, "")
 
         // VerifiedLocalityStore loads and stores genuine locality
         let coord = CLLocationCoordinate2D(latitude: 31.778, longitude: 35.235)
