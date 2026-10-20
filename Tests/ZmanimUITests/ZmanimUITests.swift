@@ -1,6 +1,13 @@
 import XCTest
 
 final class ZmanimUITests: XCTestCase {
+    private let defaultLaunchArguments = [
+        "-UITestMode", "YES",
+        "-UITestShortSnooze", "YES",
+        "-AppleLanguages", "(he)",
+        "-AppleLocale", "he_IL"
+    ]
+
     override func setUpWithError() throws {
         continueAfterFailure = false
         addUIInterruptionMonitor(withDescription: "System Dialog") { alert in
@@ -40,17 +47,40 @@ final class ZmanimUITests: XCTestCase {
         }
     }
 
+    private func notificationsTab(in app: XCUIApplication) -> XCUIElement {
+        let btnHe = app.tabBars.buttons["התראות"]
+        if btnHe.waitForExistence(timeout: 2) { return btnHe }
+        let btnEn = app.tabBars.buttons["Notifications"]
+        if btnEn.waitForExistence(timeout: 2) { return btnEn }
+        return btnHe
+    }
+
+    private func sendTestNotificationButton(in app: XCUIApplication) -> XCUIElement {
+        let btnHe = app.buttons["שלח התראת בדיקה"]
+        if btnHe.waitForExistence(timeout: 2) { return btnHe }
+        let btnEn = app.buttons["Send Test Alert"]
+        if btnEn.waitForExistence(timeout: 2) { return btnEn }
+        return btnHe
+    }
+
+    private func findSnoozeButton(in springboard: XCUIApplication) -> XCUIElement? {
+        let btnHe = springboard.buttons["נודניק 5 דק׳"]
+        if btnHe.waitForExistence(timeout: 1) { return btnHe }
+        let btnEn = springboard.buttons["Snooze 5 min"]
+        if btnEn.waitForExistence(timeout: 1) { return btnEn }
+        return nil
+    }
+
     private func expandBanner(_ banner: XCUIElement, springboard: XCUIApplication) {
         banner.swipeDown()
         Thread.sleep(forTimeInterval: 1.5)
 
-        let snoozeButton = springboard.buttons["נודניק 5 דק׳"]
-        if !snoozeButton.exists && banner.exists {
+        if findSnoozeButton(in: springboard) == nil && banner.exists {
             banner.press(forDuration: 1.2)
             Thread.sleep(forTimeInterval: 1.5)
         }
 
-        if !snoozeButton.exists && banner.exists {
+        if findSnoozeButton(in: springboard) == nil && banner.exists {
             let startCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
             let finishCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
             startCoord.press(forDuration: 0.1, thenDragTo: finishCoord)
@@ -60,7 +90,7 @@ final class ZmanimUITests: XCTestCase {
 
     func testAppLaunchesWithDeterministicJerusalemData() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestMode", "YES", "-UITestShortSnooze", "YES"]
+        app.launchArguments = defaultLaunchArguments
         app.launch()
 
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -72,19 +102,19 @@ final class ZmanimUITests: XCTestCase {
 
     func testRichNotificationExpansionAndForegroundSnooze() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestMode", "YES", "-UITestShortSnooze", "YES"]
+        app.launchArguments = defaultLaunchArguments
         app.launch()
 
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         dismissPermissionAlertIfPresent(springboard: springboard)
 
         // Switch to Notifications tab
-        let notificationsTab = app.tabBars.buttons["התראות"]
-        XCTAssertTrue(notificationsTab.waitForExistence(timeout: 10), "Expected 'התראות' tab bar button")
-        notificationsTab.tap()
+        let tab = notificationsTab(in: app)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "Expected Notifications tab bar button")
+        tab.tap()
 
-        // Tap "שלח התראת בדיקה" button
-        let sendTestButton = app.buttons["שלח התראת בדיקה"]
+        // Tap send test alert button
+        let sendTestButton = sendTestNotificationButton(in: app)
         XCTAssertTrue(sendTestButton.waitForExistence(timeout: 10), "Expected test notification button")
         sendTestButton.tap()
 
@@ -109,8 +139,11 @@ final class ZmanimUITests: XCTestCase {
         try? expandedScreenshot.pngRepresentation.write(to: tmpExpandedUrl)
 
         // 4. Mandatory assertion: Snooze action button MUST exist
-        let snoozeButton = springboard.buttons["נודניק 5 דק׳"]
-        XCTAssertTrue(snoozeButton.waitForExistence(timeout: 10), "Snooze action button 'נודניק 5 דק׳' must exist on expanded notification")
+        guard let snoozeButton = findSnoozeButton(in: springboard) ?? (springboard.buttons["נודניק 5 דק׳"].waitForExistence(timeout: 5) ? springboard.buttons["נודניק 5 דק׳"] : springboard.buttons["Snooze 5 min"]) else {
+            XCTFail("Snooze action button ('נודניק 5 דק׳' or 'Snooze 5 min') must exist on expanded notification")
+            return
+        }
+        XCTAssertTrue(snoozeButton.exists, "Snooze action button must exist on expanded notification")
 
         // 5. Tap snooze action while app is open in foreground
         snoozeButton.tap()
@@ -142,17 +175,17 @@ final class ZmanimUITests: XCTestCase {
 
     func testBackgroundSnoozeInteraction() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestMode", "YES", "-UITestShortSnooze", "YES"]
+        app.launchArguments = defaultLaunchArguments
         app.launch()
 
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         dismissPermissionAlertIfPresent(springboard: springboard)
 
-        let notificationsTab = app.tabBars.buttons["התראות"]
-        XCTAssertTrue(notificationsTab.waitForExistence(timeout: 10), "Expected 'התראות' tab")
-        notificationsTab.tap()
+        let tab = notificationsTab(in: app)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "Expected Notifications tab")
+        tab.tap()
 
-        let sendTestButton = app.buttons["שלח התראת בדיקה"]
+        let sendTestButton = sendTestNotificationButton(in: app)
         XCTAssertTrue(sendTestButton.waitForExistence(timeout: 10), "Expected test notification button")
         sendTestButton.tap()
 
@@ -170,8 +203,11 @@ final class ZmanimUITests: XCTestCase {
 
         expandBanner(banner, springboard: springboard)
 
-        let snoozeButton = springboard.buttons["נודניק 5 דק׳"]
-        XCTAssertTrue(snoozeButton.waitForExistence(timeout: 10), "Snooze action button must exist while app is in background")
+        guard let snoozeButton = findSnoozeButton(in: springboard) ?? (springboard.buttons["נודניק 5 דק׳"].waitForExistence(timeout: 5) ? springboard.buttons["נודניק 5 דק׳"] : springboard.buttons["Snooze 5 min"]) else {
+            XCTFail("Snooze action button must exist while app is in background")
+            return
+        }
+        XCTAssertTrue(snoozeButton.exists, "Snooze action button must exist while app is in background")
         snoozeButton.tap()
 
         // Mandatory assertion: Containing app must remain alive without crashing after pressing snooze while in background
