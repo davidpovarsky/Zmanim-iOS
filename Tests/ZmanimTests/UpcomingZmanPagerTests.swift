@@ -41,7 +41,8 @@ final class UpcomingZmanPagerTests: XCTestCase {
             allItems: allItems,
             referenceDate: now,
             timeZone: timeZone,
-            pageSize: 5
+            pageSize: 5,
+            locale: Locale(identifier: "he_IL")
         )
 
         let page0 = pager.items(for: 0)
@@ -104,7 +105,8 @@ final class UpcomingZmanPagerTests: XCTestCase {
             allItems: allItems,
             referenceDate: now,
             timeZone: timeZone,
-            pageSize: 5
+            pageSize: 5,
+            locale: Locale(identifier: "he_IL")
         )
 
         let page0 = pager.items(for: 0)
@@ -161,7 +163,8 @@ final class UpcomingZmanPagerTests: XCTestCase {
             allItems: allItems,
             referenceDate: now,
             timeZone: timeZone,
-            pageSize: 5
+            pageSize: 5,
+            locale: Locale(identifier: "he_IL")
         )
 
         let page0 = pager.items(for: 0)
@@ -173,7 +176,33 @@ final class UpcomingZmanPagerTests: XCTestCase {
         XCTAssertTrue(page0[1].isTomorrow)
     }
 
-    // 4. Wrap-around cyclic navigation
+    // 4. English localization gives "Tomorrow"
+    func testEnglishLocalizationTomorrow() {
+        let timeZone = TimeZone(identifier: "Asia/Jerusalem")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+
+        let now = cal.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 23, minute: 0))!
+        let tomAlot = cal.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 5, minute: 16))!
+
+        let allItems = [
+            ZmanItem(key: "tomAlot", hebrewTitle: "עלות השחר", englishTitle: "Alot", icon: "moon", date: tomAlot)
+        ]
+
+        let pager = UpcomingZmanPager(
+            allItems: allItems,
+            referenceDate: now,
+            timeZone: timeZone,
+            pageSize: 5,
+            locale: Locale(identifier: "en_US")
+        )
+
+        let page0 = pager.items(for: 0)
+        XCTAssertEqual(page0.count, 1)
+        XCTAssertEqual(page0[0].dayLabel, "Tomorrow")
+    }
+
+    // 5. Wrap-around cyclic navigation
     func testCyclicWrapAround() {
         let timeZone = TimeZone(identifier: "UTC")!
         let now = Date(timeIntervalSince1970: 100000)
