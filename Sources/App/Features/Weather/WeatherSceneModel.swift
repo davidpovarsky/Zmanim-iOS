@@ -115,12 +115,7 @@ public final class WeatherSceneModel: ObservableObject {
             )
 
             // Strictly authentic cloud fraction; never fabricate estimated measurements
-            let clouds: Double?
-            if let cloudFraction = currentHour?.cloudAreaFractionPercent {
-                clouds = cloudFraction / 100.0
-            } else {
-                clouds = nil
-            }
+            let clouds: Double = (currentHour?.cloudAreaFractionPercent.map { $0 / 100.0 }) ?? 0.0
 
             self.currentSnapshot = snapshot
             self.weatherDisplay = display
@@ -150,7 +145,7 @@ public final class WeatherSceneModel: ObservableObject {
                 self.currentSnapshot = nil
                 self.weatherDisplay = nil
                 self.condition = nil
-                self.cloudCover = nil
+                self.cloudCover = 0.0
                 self.isAvailable = false
             }
         }
