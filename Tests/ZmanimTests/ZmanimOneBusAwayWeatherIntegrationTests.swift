@@ -50,8 +50,8 @@ final class ZmanimOneBusAwayWeatherIntegrationTests: XCTestCase {
         XCTAssertTrue(display.hourly.first?.isNow == true)
         XCTAssertFalse(display.hourly[1].isNow)
 
-        XCTAssertEqual(display.conditionSummary, "מעונן חלקית")
-        XCTAssertEqual(display.chanceOfRainText, "סיכוי לגשם: 10%")
+        XCTAssertEqual(display.header.conditionSummary, "מעונן חלקית")
+        XCTAssertEqual(display.header.chanceOfRainText, "סיכוי לגשם: 10%")
         XCTAssertEqual(display.stats.feelsLikeText, "—")
         XCTAssertEqual(display.stats.precipText, "10%")
         XCTAssertEqual(display.sourceAttribution, "נתוני מזג אוויר: MET Norway (CC BY 4.0)")
@@ -80,8 +80,8 @@ final class ZmanimOneBusAwayWeatherIntegrationTests: XCTestCase {
         XCTAssertTrue(display.hourly.first?.isNow == true)
         XCTAssertFalse(display.hourly[1].isNow)
 
-        XCTAssertEqual(display.conditionSummary, "Partly Cloudy")
-        XCTAssertEqual(display.chanceOfRainText, "Chance of Rain: 10%")
+        XCTAssertEqual(display.header.conditionSummary, "Partly Cloudy")
+        XCTAssertEqual(display.header.chanceOfRainText, "Chance of Rain: 10%")
         XCTAssertEqual(display.stats.feelsLikeText, "—")
         XCTAssertEqual(display.stats.precipText, "10%")
         XCTAssertEqual(display.sourceAttribution, "Weather data: MET Norway (CC BY 4.0)")
