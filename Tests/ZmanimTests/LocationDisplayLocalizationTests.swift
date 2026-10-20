@@ -18,8 +18,8 @@ final class LocationDisplayLocalizationTests: XCTestCase {
                 locationSignature: "gps",
                 sourceIdentity: .gps
             ),
-            isPlaceholder: false,
-            isGPS: true
+            isGPS: true,
+            isPlaceholder: false
         )
 
         XCTAssertTrue(entryWithoutLocality.isGPS)
