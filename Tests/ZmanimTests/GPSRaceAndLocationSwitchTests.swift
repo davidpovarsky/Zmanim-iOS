@@ -192,7 +192,7 @@ final class GPSRaceAndLocationSwitchTests: XCTestCase {
         XCTAssertNotEqual(idA.storageKey, idB.storageKey)
 
         // Snapshot validator checks matching identity
-        let item = ZmanItem(title: "Alot Hashachar", time: Date(), format: "standard", timeFormat: "HH:mm")
+        let item = ZmanItem(key: "alotHashachar", hebrewTitle: "עלות השחר", englishTitle: "Alot Hashachar", icon: "sun.horizon", date: Date())
         let snapA = ZmanSnapshot(
             cityName: cityA.name,
             timeZoneID: cityA.timeZoneID,
@@ -211,7 +211,7 @@ final class GPSRaceAndLocationSwitchTests: XCTestCase {
 
     @MainActor
     func testR10_MetNorwayUnavailablePreservesAuthenticZmanimRendering() {
-        let item = ZmanItem(title: "Netz Hachama", time: Date(), format: "standard", timeFormat: "HH:mm")
+        let item = ZmanItem(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Netz Hachama", icon: "sunrise.fill", date: Date())
         let snapshot = ZmanSnapshot(
             cityName: "Jerusalem",
             timeZoneID: "Asia/Jerusalem",
@@ -229,7 +229,7 @@ final class GPSRaceAndLocationSwitchTests: XCTestCase {
 
         // Zmanim snapshot items are fully intact regardless of whether weather is loaded
         XCTAssertEqual(snapshot.items.count, 1)
-        XCTAssertEqual(snapshot.items.first?.title, "Netz Hachama")
+        XCTAssertEqual(snapshot.items.first?.englishTitle, "Netz Hachama")
         XCTAssertTrue(effectiveCover == nil || effectiveCover == 0.0)
     }
 }

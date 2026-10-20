@@ -16,7 +16,7 @@ public struct ZmanEntry: TimelineEntry, Sendable {
     public init(
         date: Date,
         snapshot: ZmanSnapshot?,
-        state: String?,
+        state: String? = nil,
         pageIndex: Int = 0,
         pageCount: Int = 1,
         expiresAt: Date? = nil,

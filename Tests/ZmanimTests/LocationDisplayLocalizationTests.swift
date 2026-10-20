@@ -43,7 +43,7 @@ final class LocationDisplayLocalizationTests: XCTestCase {
 
     func testW10_LocalityArrivalUpdatesHeaderWithoutRefetchingZmanim() {
         // Initial GPS snapshot with empty locality
-        let item = ZmanItem(title: "Chatzot", time: Date(), format: "standard", timeFormat: "HH:mm")
+        let item = ZmanItem(key: "chatzot", hebrewTitle: "חצות", englishTitle: "Chatzot", icon: "sun.max", date: Date())
         let initialGPS = ZmanSnapshot(
             cityName: "",
             timeZoneID: "Asia/Jerusalem",

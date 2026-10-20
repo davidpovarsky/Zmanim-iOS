@@ -19,8 +19,8 @@ public final class AppModel: ObservableObject {
     @Published public var weatherModel = WeatherSceneModel()
 
     let locationService = LocationService()
-    private var currentLocation: CLLocation?
-    private var loadGeneration: Int = 0
+    public private(set) var currentLocation: CLLocation?
+    public private(set) var loadGeneration: Int = 0
     private var activeLoadTask: Task<Void, Never>?
 
     public init() {

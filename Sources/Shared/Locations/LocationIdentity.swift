@@ -15,6 +15,10 @@ public enum LocationIdentity: Hashable, Codable, Sendable, CustomStringConvertib
         }
     }
 
+    public var storageKey: String {
+        canonicalStorageKey
+    }
+
     public var isGPS: Bool {
         if case .gps = self { return true }
         return false

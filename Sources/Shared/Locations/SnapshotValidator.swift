@@ -100,4 +100,19 @@ public struct SnapshotValidator {
             return false
         }
     }
+
+    /// Pure structural and identity validation check.
+    public static func isValid(
+        snapshot: ZmanSnapshot,
+        for identity: LocationIdentity,
+        now: Date? = nil
+    ) -> Bool {
+        if let now {
+            return isFresh(snapshot: snapshot, for: identity, now: now)
+        }
+        if snapshot.locationSignature == "demo" { return false }
+        if let sourceIdentity = snapshot.sourceIdentity, sourceIdentity != identity { return false }
+        guard TimeZone(identifier: snapshot.timeZoneID) != nil else { return false }
+        return !snapshot.items.isEmpty
+    }
 }
