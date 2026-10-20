@@ -72,18 +72,23 @@ final class ZmanimUITests: XCTestCase {
     }
 
     private func expandBanner(_ banner: XCUIElement, springboard: XCUIApplication) {
-        banner.swipeDown()
-        Thread.sleep(forTimeInterval: 1.5)
+        Thread.sleep(forTimeInterval: 1.0)
 
-        if findSnoozeButton(in: springboard) == nil && banner.exists {
-            banner.press(forDuration: 1.2)
+        // Use coordinate-based drag first to prevent AXScrollToVisible failure while banner animates on screen
+        if banner.exists {
+            let startCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let finishCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 3.0))
+            startCoord.press(forDuration: 0.2, thenDragTo: finishCoord)
             Thread.sleep(forTimeInterval: 1.5)
         }
 
         if findSnoozeButton(in: springboard) == nil && banner.exists {
-            let startCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
-            let finishCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
-            startCoord.press(forDuration: 0.1, thenDragTo: finishCoord)
+            banner.press(forDuration: 1.5)
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+
+        if findSnoozeButton(in: springboard) == nil && banner.exists {
+            banner.swipeDown()
             Thread.sleep(forTimeInterval: 1.5)
         }
     }
