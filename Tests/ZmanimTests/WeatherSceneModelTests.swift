@@ -12,18 +12,19 @@ final class WeatherSceneModelTests: XCTestCase {
         let hour = WeatherHour(
             time: now,
             temperatureCelsius: 18.0,
+            windMetersPerSecond: 2.0,
+            precipitationChancePercent: 0,
+            cloudAreaFractionPercent: nil,
             symbolCode: "overcast",
-            precipitationAmountMm: 0,
-            windSpeedMps: 2.0,
-            relativeHumidityPercent: 60.0,
-            cloudAreaFractionPercent: nil
+            iconKey: "cloud.fill"
         )
 
         let snapshot = WeatherSnapshot(
-            coordinate: CLLocationCoordinate2D(latitude: 31.76, longitude: 35.21),
+            hours: [hour],
             retrievedAt: now,
-            expiresAt: now.addingTimeInterval(3600),
-            hours: [hour]
+            locationLatitude: 31.76,
+            locationLongitude: 35.21,
+            expiresAt: now.addingTimeInterval(3600)
         )
 
         // Reset and check initial
