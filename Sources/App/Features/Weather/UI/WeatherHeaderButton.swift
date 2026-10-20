@@ -49,8 +49,11 @@ public struct WeatherHeaderButton: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("תחזית מזג אוויר עבור \(cityName): \(display.buttonTitle), \(display.header.conditionSummary)")
-            .accessibilityHint("הקש לפתיחת כרטיס תחזית מפורט")
+            .accessibilityLabel(String(
+                format: NSLocalizedString("weather.header_a11y_format", value: "תחזית מזג אוויר עבור %1$@: %2$@, %3$@", comment: ""),
+                cityName, display.buttonTitle, display.header.conditionSummary
+            ))
+            .accessibilityHint(Text("weather.header_a11y_hint"))
             .accessibilityAddTraits(.isButton)
         } else {
             // When weather is unavailable: location only, no fake weather text or button

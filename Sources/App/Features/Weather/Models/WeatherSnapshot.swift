@@ -6,8 +6,9 @@ public struct WeatherSnapshot: Sendable, Equatable, Codable {
     public let locationLatitude: Double
     public let locationLongitude: Double
     public let expiresAt: Date?
-    public let lastModified: String?
-    public static let attribution = "נתוני מזג אוויר: MET Norway (CC BY 4.0)"
+    public static var attribution: String {
+        NSLocalizedString("weather.source_attribution", value: "נתוני מזג אוויר: MET Norway (CC BY 4.0)", comment: "")
+    }
 
     public init(
         hours: [WeatherHour],

@@ -19,7 +19,7 @@ final class NextZmanResolverTests: XCTestCase {
         XCTAssertNil(result?.dayLabel)
     }
 
-    func testResolvesTomorrowZmanWhenAllTodayZmanimHavePassed() {
+    func testResolvesTomorrowZmanWhenAllTodayZmanimHavePassedHebrew() {
         let timeZone = TimeZone(identifier: "Asia/Jerusalem")!
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -41,11 +41,31 @@ final class NextZmanResolverTests: XCTestCase {
             ZmanItem(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Sunrise", icon: "sunrise.fill", date: tomorrowSunrise)
         ]
 
-        let result = NextZmanResolver.resolve(allItems: items, now: now, timeZone: timeZone)
+        let result = NextZmanResolver.resolve(allItems: items, now: now, timeZone: timeZone, locale: Locale(identifier: "he_IL"))
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.item.key, "alotHaShachar")
         XCTAssertTrue(result?.isTomorrow ?? false)
         XCTAssertEqual(result?.dayLabel, "מחר")
+    }
+
+    func testResolvesTomorrowZmanWhenAllTodayZmanimHavePassedEnglish() {
+        let timeZone = TimeZone(identifier: "Asia/Jerusalem")!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+
+        let components = DateComponents(year: 2026, month: 10, day: 19, hour: 21, minute: 0, second: 0)
+        let now = calendar.date(from: components)!
+
+        let tomorrowAlot = calendar.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 5, minute: 32, second: 0))!
+        let items = [
+            ZmanItem(key: "alotHaShachar", hebrewTitle: "עלות השחר", englishTitle: "Alot HaShachar", icon: "moon.stars.fill", date: tomorrowAlot)
+        ]
+
+        let result = NextZmanResolver.resolve(allItems: items, now: now, timeZone: timeZone, locale: Locale(identifier: "en_US"))
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.item.key, "alotHaShachar")
+        XCTAssertTrue(result?.isTomorrow ?? false)
+        XCTAssertEqual(result?.dayLabel, "Tomorrow")
     }
 
     func testReturnsNilWhenNoFutureItemsRemain() {

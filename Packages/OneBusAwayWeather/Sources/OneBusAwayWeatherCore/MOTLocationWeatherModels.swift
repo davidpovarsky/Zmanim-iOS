@@ -14,7 +14,18 @@ nonisolated public struct MOTLocationWeatherSnapshot: Sendable, Equatable {
     public let retrievedAt: Date
     public let locationLatitude: Double
     public let locationLongitude: Double
-    public static let attribution = "Weather data: MET Norway (CC BY 4.0)"
+    public static var attribution: String {
+        attribution(language: nil)
+    }
+
+    public static func attribution(language: String? = nil) -> String {
+        OBALoc(
+            "weather.source_attribution",
+            value: "Weather data: MET Norway (CC BY 4.0)",
+            comment: "Attribution for MET Norway weather data",
+            language: language
+        )
+    }
 
     public init(
         hours: [MOTLocationWeatherHour],

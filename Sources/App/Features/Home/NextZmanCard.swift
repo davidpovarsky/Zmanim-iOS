@@ -33,7 +33,7 @@ public struct NextZmanCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("הזמן הבא")
+                        Text("next_zman")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -47,7 +47,7 @@ public struct NextZmanCard: View {
                         }
                     }
 
-                    Text(item.hebrewTitle)
+                    Text(item.displayTitle)
                         .font(.headline)
                 }
 
@@ -72,7 +72,7 @@ public struct NextZmanCard: View {
             }
             .zmanCard()
         } else {
-            Text(errorMessage ?? "אין נתוני זמנים זמינים")
+            Text(errorMessage ?? NSLocalizedString("no_zmanim_data", comment: ""))
                 .frame(maxWidth: .infinity)
                 .padding(22)
                 .zmanCard()
@@ -81,16 +81,16 @@ public struct NextZmanCard: View {
 
     private func formatRemaining(to target: Date, from current: Date) -> String {
         let diff = target.timeIntervalSince(current)
-        guard diff > 0 else { return "עכשיו" }
+        guard diff > 0 else { return NSLocalizedString("remaining.now", value: "עכשיו", comment: "") }
         let totalMinutes = Int(ceil(diff / 60.0))
         let hours = totalMinutes / 60
         let mins = totalMinutes % 60
         if hours == 0 {
-            return "בעוד \(mins) דק׳"
+            return String(format: NSLocalizedString("remaining.minutes_format", value: "בעוד %d דק׳", comment: ""), mins)
         } else if mins == 0 {
-            return "בעוד \(hours) שעות"
+            return String(format: NSLocalizedString("remaining.hours_format", value: "בעוד %d שעות", comment: ""), hours)
         } else {
-            return "בעוד \(hours) שעות ו-\(mins) דק׳"
+            return String(format: NSLocalizedString("remaining.hours_minutes_format", value: "בעוד %1$d שעות ו-%2$d דק׳", comment: ""), hours, mins)
         }
     }
 

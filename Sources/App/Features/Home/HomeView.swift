@@ -15,7 +15,7 @@ public struct HomeView: View {
             TimelineView(.periodic(from: .now, by: 30)) { timeline in
                 homeTimelineContent(for: timeline.date)
             }
-            .navigationTitle("זמנים")
+            .navigationTitle(Text("app_name"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -134,7 +134,7 @@ public struct HomeView: View {
 
     private var homeAttributionFooter: some View {
         VStack(spacing: 4) {
-            Text("נתוני הזמנים באדיבות Hebcal.com")
+            Text("zmanim_data_source")
             if model.weatherModel.isAvailable {
                 Text(model.weatherModel.weatherDisplay?.sourceAttribution ?? WeatherSnapshot.attribution)
             }
@@ -174,11 +174,11 @@ private struct SolarHero: View {
                     }
 
                     if let sunrise {
-                        label("זריחה", sunrise)
+                        label(NSLocalizedString("sunrise", comment: ""), sunrise)
                             .position(x: arc.startPoint.x + 24, y: arc.base + 16)
                     }
                     if let sunset {
-                        label("שקיעה", sunset)
+                        label(NSLocalizedString("sunset", comment: ""), sunset)
                             .position(x: arc.endPoint.x - 24, y: arc.base + 16)
                     }
                     if let sunrise, let sunset, now >= sunrise, now <= sunset {

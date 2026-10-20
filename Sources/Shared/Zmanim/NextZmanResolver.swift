@@ -18,7 +18,8 @@ public enum NextZmanResolver {
     public static func resolve(
         allItems: [ZmanItem],
         now: Date,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        locale: Locale = .autoupdatingCurrent
     ) -> NextZmanResult? {
         let sorted = allItems.sorted { $0.date < $1.date }
         guard let nextItem = sorted.first(where: { $0.date > now }) else {
@@ -32,15 +33,18 @@ public enum NextZmanResolver {
             return NextZmanResult(item: nextItem, isTomorrow: false, dayLabel: nil)
         }
 
+        let isEnglish = (locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")) == "en"
+        let tomorrowLabel = isEnglish ? "Tomorrow" : "מחר"
+
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
            calendar.isDate(nextItem.date, inSameDayAs: tomorrow) {
-            return NextZmanResult(item: nextItem, isTomorrow: true, dayLabel: "מחר")
+            return NextZmanResult(item: nextItem, isTomorrow: true, dayLabel: tomorrowLabel)
         }
 
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = timeZone
-        formatter.locale = Locale(identifier: "he_IL")
+        formatter.locale = locale
         formatter.dateFormat = "EEEE"
         let dayName = formatter.string(from: nextItem.date)
         return NextZmanResult(item: nextItem, isTomorrow: true, dayLabel: dayName)

@@ -39,7 +39,7 @@ struct ZmanProvider: TimelineProvider {
                     completion(makeTimeline(snapshot: cached, now: now, state: stateNote, pageState: pageState))
                     return
                 } else {
-                    let recovery = "פתח את האפליקציה לרענון \(settings.fixedCity)"
+                    let recovery = String(format: NSLocalizedString("widget.open_app_to_refresh_city_format", value: "פתח את האפליקציה לרענון %@", comment: ""), settings.fixedCity)
                     let entry = ZmanEntry(date: now, snapshot: nil, state: recovery, pageIndex: 0, pageCount: 1)
                     completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300))))
                     return
@@ -112,13 +112,13 @@ struct ZmanProvider: TimelineProvider {
             let recoveryMessage: String
             switch state {
             case .appAuthorizedWidgetDenied:
-                recoveryMessage = "יש לאשר מיקום בווידג'ט"
+                recoveryMessage = NSLocalizedString("widget.location_required", value: "יש לאשר מיקום בווידג'ט", comment: "")
             case .deniedOrRestricted:
-                recoveryMessage = "נדרשת הרשאת מיקום"
+                recoveryMessage = NSLocalizedString("widget.permission_required", value: "נדרשת הרשאת מיקום", comment: "")
             case .notDetermined:
-                recoveryMessage = "פתח את האפליקציה לרענון"
+                recoveryMessage = NSLocalizedString("widget.open_app_to_refresh", value: "פתח את האפליקציה לרענון", comment: "")
             default:
-                recoveryMessage = "אין נתוני זמנים זמינים"
+                recoveryMessage = NSLocalizedString("widget.no_data", value: "אין נתוני זמנים זמינים", comment: "")
             }
 
             #if DEBUG
@@ -133,7 +133,7 @@ struct ZmanProvider: TimelineProvider {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         formatter.timeZone = snapshot.timeZone
-        return "עודכן ב-\(formatter.string(from: snapshot.updatedAt))"
+        return String(format: NSLocalizedString("widget.updated_at_format", value: "עודכן ב-%@", comment: ""), formatter.string(from: snapshot.updatedAt))
     }
 
     private func isSnapshotFresh(_ snapshot: ZmanSnapshot, now: Date) -> Bool {
@@ -259,8 +259,8 @@ struct ZmanimWidget: Widget {
             ZmanWidgetView(entry: entry)
                 .containerBackground(Color(red: 0.972, green: 0.966, blue: 0.936), for: .widget)
         }
-        .configurationDisplayName("זמני היום")
-        .description("הזמן הבא, מסלול השמש ודפדוף זמני היום.")
+        .configurationDisplayName(LocalizedStringResource("widget.display_name", defaultValue: "זמני היום"))
+        .description(LocalizedStringResource("widget.description", defaultValue: "הזמן הבא, מסלול השמש ודפדוף זמני היום."))
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
 }

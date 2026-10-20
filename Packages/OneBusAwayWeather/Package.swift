@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "OneBusAwayWeather",
-    defaultLocalization: "en",
+    defaultLocalization: "he",
     platforms: [
         .iOS(.v17),
         .macOS(.v14)

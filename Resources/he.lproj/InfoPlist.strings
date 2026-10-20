@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "זמנים";
-"CFBundleName" = "Zmanim";
+"CFBundleName" = "זמנים";
+"NSLocationWhenInUseUsageDescription" = "המיקום משמש לחישוב זמני היום המדויקים באזור שלך.";

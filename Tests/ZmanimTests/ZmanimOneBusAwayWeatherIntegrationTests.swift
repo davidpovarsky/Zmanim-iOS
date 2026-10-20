@@ -4,11 +4,7 @@ import OneBusAwayWeatherUI
 @testable import Zmanim
 
 final class ZmanimOneBusAwayWeatherIntegrationTests: XCTestCase {
-    func testAdapterConstructsAuthoritativeWeatherDisplay() {
-        let now = Date()
-        let tz = TimeZone(identifier: "Asia/Jerusalem")!
-        let locale = Locale(identifier: "he_IL")
-
+    private func makeSampleSnapshot(now: Date) -> WeatherSnapshot {
         let hours: [WeatherHour] = (0..<30).map { i in
             let date = now.addingTimeInterval(Double(i * 3600))
             return WeatherHour(
@@ -22,37 +18,73 @@ final class ZmanimOneBusAwayWeatherIntegrationTests: XCTestCase {
             )
         }
 
-        let snapshot = WeatherSnapshot(
+        return WeatherSnapshot(
             hours: hours,
             retrievedAt: now,
             locationLatitude: 31.778,
             locationLongitude: 35.235,
             expiresAt: now.addingTimeInterval(1800)
         )
+    }
+
+    func testAdapterConstructsAuthoritativeWeatherDisplayHebrewStrict() {
+        let now = Date()
+        let tz = TimeZone(identifier: "Asia/Jerusalem")!
+        let locale = Locale(identifier: "he_IL")
+        let snapshot = makeSampleSnapshot(now: now)
 
         let display = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
             from: snapshot,
             cityName: "ירושלים",
             timeZone: tz,
             locale: locale,
-            now: now
+            now: now,
+            language: "he"
         )
 
         XCTAssertNotNil(display)
         guard let display else { return }
 
-        // Hourly strip should contain upcoming hours with index 0 labeled "עכשיו" or "Now" depending on runner environment
         XCTAssertGreaterThanOrEqual(display.hourly.count, 24)
-        XCTAssertTrue(display.hourly.first?.timeLabel == "עכשיו" || display.hourly.first?.timeLabel == "Now", "Expected 'עכשיו' or 'Now', got \(String(describing: display.hourly.first?.timeLabel))")
+        XCTAssertEqual(display.hourly.first?.timeLabel, "עכשיו")
         XCTAssertTrue(display.hourly.first?.isNow == true)
         XCTAssertFalse(display.hourly[1].isNow)
 
-        // Three-slot layout: feelsLikeText must be literal em dash "—"
+        XCTAssertEqual(display.conditionSummary, "מעונן חלקית")
+        XCTAssertEqual(display.chanceOfRainText, "סיכוי לגשם: 10%")
         XCTAssertEqual(display.stats.feelsLikeText, "—")
         XCTAssertEqual(display.stats.precipText, "10%")
+        XCTAssertEqual(display.sourceAttribution, "נתוני מזג אוויר: MET Norway (CC BY 4.0)")
+    }
 
-        // Source attribution from MET Norway
-        XCTAssertEqual(display.sourceAttribution, MOTLocationWeatherSnapshot.attribution)
+    func testAdapterConstructsAuthoritativeWeatherDisplayEnglishStrict() {
+        let now = Date()
+        let tz = TimeZone(identifier: "Asia/Jerusalem")!
+        let locale = Locale(identifier: "en_US")
+        let snapshot = makeSampleSnapshot(now: now)
+
+        let display = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
+            from: snapshot,
+            cityName: "Jerusalem",
+            timeZone: tz,
+            locale: locale,
+            now: now,
+            language: "en"
+        )
+
+        XCTAssertNotNil(display)
+        guard let display else { return }
+
+        XCTAssertGreaterThanOrEqual(display.hourly.count, 24)
+        XCTAssertEqual(display.hourly.first?.timeLabel, "Now")
+        XCTAssertTrue(display.hourly.first?.isNow == true)
+        XCTAssertFalse(display.hourly[1].isNow)
+
+        XCTAssertEqual(display.conditionSummary, "Partly Cloudy")
+        XCTAssertEqual(display.chanceOfRainText, "Chance of Rain: 10%")
+        XCTAssertEqual(display.stats.feelsLikeText, "—")
+        XCTAssertEqual(display.stats.precipText, "10%")
+        XCTAssertEqual(display.sourceAttribution, "Weather data: MET Norway (CC BY 4.0)")
     }
 
     func testAdapterResolvesSkyConditionForSwiftUISky() {

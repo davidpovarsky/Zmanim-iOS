@@ -62,7 +62,7 @@ public struct HomeHeader: View {
         let formatter = DateFormatter()
         formatter.calendar = cal
         formatter.timeZone = timeZone
-        formatter.locale = Locale(identifier: "he_IL")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.dateFormat = "EEEE"
         return formatter.string(from: date)
     }
@@ -71,7 +71,7 @@ public struct HomeHeader: View {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .hebrew)
         formatter.timeZone = timeZone
-        formatter.locale = Locale(identifier: "he_IL")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.dateStyle = .long
         return formatter.string(from: date)
     }

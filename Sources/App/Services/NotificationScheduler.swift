@@ -11,12 +11,12 @@ enum NotificationScheduler {
     static func configureCategories() {
         let snooze = UNNotificationAction(
             identifier: snoozeActionID,
-            title: "נודניק 5 דק׳",
+            title: NSLocalizedString("notification.snooze_5_min", value: "נודניק 5 דק׳", comment: ""),
             options: []
         )
         let open = UNNotificationAction(
             identifier: openActionID,
-            title: "פתח זמני היום",
+            title: NSLocalizedString("notification.open_zmanim", value: "פתח זמני היום", comment: ""),
             options: [.foreground]
         )
         let category = UNNotificationCategory(
@@ -79,12 +79,12 @@ enum NotificationScheduler {
 
     static func sendTestNotification() async {
         let content = UNMutableNotificationContent()
-        content.title = "שקיעה בעוד 15 דקות"
-        content.body = "שקיעה היום בשעה 18:21"
+        content.title = NSLocalizedString("notification.test_title", value: "שקיעה בעוד 15 דקות", comment: "")
+        content.body = NSLocalizedString("notification.test_body", value: "שקיעה היום בשעה 18:21", comment: "")
         content.sound = .default
         content.categoryIdentifier = categoryID
         content.userInfo = [
-            "zmanTitle": "שקיעה",
+            "zmanTitle": NSLocalizedString("sunset", value: "שקיעה", comment: ""),
             "zmanTime": Date().addingTimeInterval(900).timeIntervalSince1970,
             "zmanIcon": "sunset.fill"
         ]
@@ -99,8 +99,13 @@ enum NotificationScheduler {
         let formatter = DateFormatter()
         formatter.timeZone = timeZone
         formatter.dateFormat = "HH:mm"
-        if rule.offsetMinutes == 0 { return "הזמן הגיע · \(formatter.string(from: item.date))" }
-        return "\(abs(rule.offsetMinutes)) דקות \(rule.offsetMinutes < 0 ? "לפני" : "אחרי") · \(formatter.string(from: item.date))"
+        if rule.offsetMinutes == 0 {
+            return String(format: NSLocalizedString("notification.time_arrived_time", value: "הזמן הגיע · %@", comment: ""), formatter.string(from: item.date))
+        } else if rule.offsetMinutes < 0 {
+            return String(format: NSLocalizedString("notification.minutes_before_format", value: "%1$d דקות לפני · %2$@", comment: ""), abs(rule.offsetMinutes), formatter.string(from: item.date))
+        } else {
+            return String(format: NSLocalizedString("notification.minutes_after_format", value: "%1$d דקות אחרי · %2$@", comment: ""), abs(rule.offsetMinutes), formatter.string(from: item.date))
+        }
     }
 }
 

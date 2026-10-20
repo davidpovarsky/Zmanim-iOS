@@ -38,7 +38,14 @@ public struct WeatherDisplay: Equatable {
     /// Non-nil for independently sourced, GPS-based forecasts.
     public let sourceAttribution: String?
 
-    public init?(locationForecast: MOTLocationWeatherSnapshot, locationName: String, locale: Locale, timeZone: TimeZone? = nil, now: Date = .now) {
+    public init?(
+        locationForecast: MOTLocationWeatherSnapshot,
+        locationName: String,
+        locale: Locale,
+        timeZone: TimeZone? = nil,
+        now: Date = .now,
+        language: String? = nil
+    ) {
         guard let current = locationForecast.hours.last(where: { $0.time <= now })
             ?? locationForecast.hours.first else { return nil }
 
@@ -60,13 +67,13 @@ public struct WeatherDisplay: Equatable {
         header = Header(
             iconName: current.iconKey,
             regionName: locationName,
-            conditionSummary: WeatherFormatter.conditionText(for: current.iconKey),
+            conditionSummary: WeatherFormatter.conditionText(for: current.iconKey, language: language),
             chanceOfRainText: chance.map {
-                String(format: OBALoc("weather.chance_of_rain_format", value: "Chance of Rain: %d%%", comment: "Current chance of rain"), $0)
+                String(format: OBALoc("weather.chance_of_rain_format", value: "Chance of Rain: %d%%", comment: "Current chance of rain", language: language), $0)
             } ?? "—",
             currentTemp: currentTemperature,
             highLowText: String(
-                format: OBALoc("weather.high_low_format", value: "H:%@  L:%@", comment: "High and low temperatures"),
+                format: OBALoc("weather.high_low_format", value: "H:%@  L:%@", comment: "High and low temperatures", language: language),
                 temperature(high), temperature(low)
             )
         )
@@ -81,14 +88,14 @@ public struct WeatherDisplay: Equatable {
             HourlyEntry(
                 id: hour.time,
                 timeLabel: index == 0
-                    ? OBALoc("weather.now", value: "Now", comment: "Current hourly forecast")
+                    ? OBALoc("weather.now", value: "Now", comment: "Current hourly forecast", language: language)
                     : WeatherFormatter.formatTime(hour.time, locale: locale, timeZone: timeZone),
                 iconName: hour.iconKey,
                 temp: temperature(hour.temperatureCelsius),
                 isNow: index == 0
             )
         }
-        sourceAttribution = MOTLocationWeatherSnapshot.attribution
+        sourceAttribution = MOTLocationWeatherSnapshot.attribution(language: language)
     }
 
     public init(forecast: WeatherForecast, locale: Locale, now: Date = .now, calendar: Calendar = .current) {

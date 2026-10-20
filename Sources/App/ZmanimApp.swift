@@ -26,13 +26,11 @@ struct ZmanimApp: App {
             if let renderArg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("-RenderWidget:") }) {
                 let family = String(renderArg.dropFirst("-RenderWidget:".count))
                 WidgetHarnessView(family: family, model: model)
-                    .environment(\.layoutDirection, .rightToLeft)
                     .preferredColorScheme(.light)
                     .task { model.start() }
             } else {
                 RootView()
                     .environmentObject(model)
-                    .environment(\.layoutDirection, .rightToLeft)
                     .preferredColorScheme(.light)
                     .task {
                         if let previewArg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("-WeatherPreview:") }) {
@@ -49,7 +47,6 @@ struct ZmanimApp: App {
             #else
             RootView()
                 .environmentObject(model)
-                .environment(\.layoutDirection, .rightToLeft)
                 .preferredColorScheme(.light)
                 .task { model.start() }
             #endif
@@ -61,9 +58,9 @@ struct RootView: View {
     var body: some View {
         TabView {
             HomeView()
-                .tabItem { Label("היום", systemImage: "sun.max.fill") }
+                .tabItem { Label(LocalizedStringKey("today"), systemImage: "sun.max.fill") }
             NotificationSettingsView()
-                .tabItem { Label("התראות", systemImage: "bell.badge.fill") }
+                .tabItem { Label(LocalizedStringKey("notifications"), systemImage: "bell.badge.fill") }
         }
         .tint(.zmanIndigo)
     }

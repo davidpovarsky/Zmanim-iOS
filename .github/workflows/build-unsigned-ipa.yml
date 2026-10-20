@@ -127,6 +127,15 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$WIDGET_PATH/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NOTIFICATION_PATH/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDevelopmentRegion' "$APP_PATH/Info.plist" | grep -Fx 'he'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP_PATH/Info.plist" | grep -F 'he'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP_PATH/Info.plist" | grep -F 'en'
+          test -d "$APP_PATH/he.lproj"
+          test -d "$APP_PATH/en.lproj"
+          test -f "$APP_PATH/he.lproj/Localizable.strings"
+          test -f "$APP_PATH/en.lproj/Localizable.strings"
+          test -f "$APP_PATH/he.lproj/InfoPlist.strings"
+          test -f "$APP_PATH/en.lproj/InfoPlist.strings"
 
       - name: Live Activity · refresh
         uses: davidpovarsky/github-automation/live-refresh@main
@@ -242,8 +251,9 @@ jobs:
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qry Zmanim-unsigned.ipa Payload
-          chmod +x scripts/verify-ipa-extensions.sh
+          chmod +x scripts/verify-ipa-extensions.sh scripts/verify-ipa-localizations.sh
           bash scripts/verify-ipa-extensions.sh Zmanim-unsigned.ipa
+          bash scripts/verify-ipa-localizations.sh Zmanim-unsigned.ipa
 
       - name: Live Activity · refresh
         uses: davidpovarsky/github-automation/live-refresh@main

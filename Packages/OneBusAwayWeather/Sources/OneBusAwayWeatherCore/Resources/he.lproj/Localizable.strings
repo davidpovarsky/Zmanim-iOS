@@ -8,3 +8,4 @@
 "weather.condition.snow" = "שלג";
 "weather.condition.unknown" = "—";
 "weather.condition.wind" = "רוח חזקה";
+"weather.source_attribution" = "נתוני מזג אוויר: MET Norway (CC BY 4.0)";

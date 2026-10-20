@@ -58,7 +58,7 @@ public struct ZmanWidgetView: View {
                 .gaugeStyle(.accessoryCircularCapacity)
         case .accessoryRectangular:
             VStack(alignment: .leading) {
-                Text(entry.next?.hebrewTitle ?? "זמנים").bold()
+                Text(entry.next?.displayTitle ?? NSLocalizedString("app_name", value: "זמנים", comment: "")).bold()
                 Text(nextTime).monospacedDigit()
                 if let next = entry.next { Text(next.date, style: .relative).font(.caption2) }
             }
@@ -74,7 +74,7 @@ public struct ZmanWidgetView: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("זמני היום").font(.headline)
+                Text("daily_zmanim").font(.headline)
                 Spacer()
                 Image(systemName: entry.next?.icon ?? "sun.max.fill")
                     .font(.subheadline)
@@ -82,13 +82,13 @@ public struct ZmanWidgetView: View {
             }
             Spacer()
             if let next = entry.next {
-                Text(next.hebrewTitle).font(.headline)
+                Text(next.displayTitle).font(.headline)
                 Text(nextTime).font(.title.monospacedDigit().bold())
             } else if let state = entry.state {
                 Text(state).font(.caption).foregroundStyle(.secondary)
                 Text(nextTime).font(.title2.monospacedDigit())
             } else {
-                Text("אין נתונים").font(.headline)
+                Text("widget.no_data").font(.headline)
                 Text("--:--").font(.title.monospacedDigit())
             }
             Spacer()
@@ -106,13 +106,13 @@ public struct ZmanWidgetView: View {
     private var medium: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text(entry.snapshot?.cityName ?? "זמני היום").font(.caption).foregroundStyle(.secondary)
+                Text(entry.snapshot?.cityName.isEmpty == false ? entry.snapshot!.cityName : NSLocalizedString("daily_zmanim", value: "זמני היום", comment: "")).font(.caption).foregroundStyle(.secondary)
                 if let next = entry.next {
-                    Text(next.hebrewTitle).font(.title3.bold())
+                    Text(next.displayTitle).font(.title3.bold())
                     Text(nextTime).font(.title.monospacedDigit().bold())
                     Text(next.date, style: .relative).font(.caption).foregroundStyle(.orange)
                 } else {
-                    Text(entry.state ?? "אין נתונים").font(.title3.bold())
+                    Text(entry.state ?? NSLocalizedString("widget.no_data", value: "אין נתונים", comment: "")).font(.title3.bold())
                     Text(nextTime).font(.title.monospacedDigit().bold())
                 }
             }
@@ -120,7 +120,7 @@ public struct ZmanWidgetView: View {
             if let snapshot = entry.snapshot {
                 SolarMini(snapshot: snapshot, now: entry.date).frame(width: 150, height: 90)
             } else {
-                ContentUnavailableView("אין נתונים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
+                ContentUnavailableView(String(localized: "widget.no_data"), systemImage: "location.slash", description: Text(entry.state ?? NSLocalizedString("widget.open_app_to_refresh", value: "פתח את האפליקציה לרענון", comment: "")))
                     .frame(width: 150, height: 90)
             }
         }
@@ -129,7 +129,7 @@ public struct ZmanWidgetView: View {
     private var large: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("זמני היום").font(.title2.bold())
+                Text("daily_zmanim").font(.title2.bold())
                 Spacer()
                 Text(entry.snapshot?.cityName ?? "").foregroundStyle(.secondary)
             }
@@ -151,7 +151,7 @@ public struct ZmanWidgetView: View {
                                 .font(.system(size: 15))
                                 .frame(width: 25)
                                 .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
-                            Text(item.hebrewTitle)
+                            Text(item.displayTitle)
                                 .font(.subheadline)
                                 .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
                             Spacer()
@@ -178,7 +178,7 @@ public struct ZmanWidgetView: View {
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("חזור לחמשת הזמנים הקודמים")
+                            .accessibilityLabel(String(localized: "widget.a11y.previous_page"))
                         }
 
                         Button(intent: NextWidgetPageIntent()) {
@@ -189,13 +189,13 @@ public struct ZmanWidgetView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("עבור לחמשת הזמנים הבאים")
+                        .accessibilityLabel(String(localized: "widget.a11y.next_page"))
 
                         Spacer()
                     }
                 }
             } else {
-                ContentUnavailableView("אין נתוני זמנים", systemImage: "location.slash", description: Text(entry.state ?? "פתח את האפליקציה לרענון"))
+                ContentUnavailableView(String(localized: "no_zmanim_data"), systemImage: "location.slash", description: Text(entry.state ?? NSLocalizedString("widget.open_app_to_refresh", value: "פתח את האפליקציה לרענון", comment: "")))
             }
 
             if let state = entry.state, entry.snapshot != nil {
@@ -204,7 +204,7 @@ public struct ZmanWidgetView: View {
         }
     }
 
-    private var inlineText: String { "\(entry.next?.hebrewTitle ?? "זמנים") \(nextTime)" }
+    private var inlineText: String { "\(entry.next?.displayTitle ?? NSLocalizedString("app_name", value: "זמנים", comment: "")) \(nextTime)" }
     private var nextTime: String { entry.next.map { time($0.date) } ?? "--:--" }
 
     private func time(_ date: Date) -> String {

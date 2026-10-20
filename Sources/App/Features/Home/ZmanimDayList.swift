@@ -13,7 +13,7 @@ public struct ZmanimDayList: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("זמני היום").font(.title3.bold())
+            Text("daily_zmanim").font(.title3.bold())
 
             VStack(spacing: 0) {
                 ForEach(items) { item in
@@ -23,8 +23,11 @@ public struct ZmanimDayList: View {
                             .frame(width: 28)
 
                         VStack(alignment: .leading) {
-                            Text(item.hebrewTitle).font(.body.weight(.medium))
-                            Text(item.englishTitle).font(.caption2).foregroundStyle(.secondary)
+                            Text(item.displayTitle).font(.body.weight(.medium))
+                            let subtitle = item.displayTitle == item.hebrewTitle ? item.englishTitle : item.hebrewTitle
+                            if !subtitle.isEmpty {
+                                Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                            }
                         }
 
                         Spacer()

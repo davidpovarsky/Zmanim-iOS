@@ -29,8 +29,9 @@ public enum ZmanimWeatherDisplayAdapter {
         from snapshot: WeatherSnapshot,
         cityName: String,
         timeZone: TimeZone,
-        locale: Locale = Locale(identifier: "he_IL"),
-        now: Date = Date()
+        locale: Locale = .autoupdatingCurrent,
+        now: Date = Date(),
+        language: String? = nil
     ) -> WeatherDisplay? {
         let motSnapshot = makeMOTSnapshot(from: snapshot)
         return WeatherDisplay(
@@ -38,7 +39,8 @@ public enum ZmanimWeatherDisplayAdapter {
             locationName: cityName,
             locale: locale,
             timeZone: timeZone,
-            now: now
+            now: now,
+            language: language
         )
     }
 

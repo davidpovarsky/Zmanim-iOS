@@ -8,3 +8,4 @@
 "weather.condition.snow" = "Snow";
 "weather.condition.unknown" = "—";
 "weather.condition.wind" = "Windy";
+"weather.source_attribution" = "Weather data: MET Norway (CC BY 4.0)";

@@ -24,11 +24,7 @@ final class OneBusAwayWeatherTests: XCTestCase {
         XCTAssertEqual(METLocationWeatherConverter.iconKey(from: "heavyrain"), "rain")
     }
 
-    func testWeatherDisplayFromLocationSnapshot() {
-        let now = Date()
-        let tz = TimeZone(identifier: "Asia/Jerusalem")!
-        let locale = Locale(identifier: "he_IL")
-
+    private func makeSampleSnapshot(now: Date) -> MOTLocationWeatherSnapshot {
         let hours = (0..<30).map { i in
             MOTLocationWeatherHour(
                 time: now.addingTimeInterval(Double(i * 3600)),
@@ -39,38 +35,96 @@ final class OneBusAwayWeatherTests: XCTestCase {
             )
         }
 
-        let snapshot = MOTLocationWeatherSnapshot(
+        return MOTLocationWeatherSnapshot(
             hours: hours,
             retrievedAt: now,
             locationLatitude: 31.778,
             locationLongitude: 35.235
         )
+    }
+
+    func testWeatherDisplayHebrewLocalizationStrict() {
+        let now = Date()
+        let tz = TimeZone(identifier: "Asia/Jerusalem")!
+        let locale = Locale(identifier: "he_IL")
+        let snapshot = makeSampleSnapshot(now: now)
 
         let display = WeatherDisplay(
             locationForecast: snapshot,
             locationName: "ירושלים",
             locale: locale,
             timeZone: tz,
-            now: now
+            now: now,
+            language: "he"
         )
 
         XCTAssertNotNil(display)
         guard let display else { return }
 
         XCTAssertEqual(display.header.regionName, "ירושלים")
-        XCTAssertEqual(display.hourly.count, 25) // Up to 25 upcoming hours as defined in original WeatherDisplay
-        XCTAssertTrue(display.hourly.first?.timeLabel == "עכשיו" || display.hourly.first?.timeLabel == "Now", "Expected 'עכשיו' or 'Now', got \(String(describing: display.hourly.first?.timeLabel))")
+        XCTAssertEqual(display.hourly.count, 25)
+        XCTAssertEqual(display.hourly.first?.timeLabel, "עכשיו", "Strict Hebrew check: must be 'עכשיו', never 'Now'")
         XCTAssertTrue(display.hourly.first?.isNow == true)
-        XCTAssertFalse(display.hourly[1].isNow)
-
-        // Three stats check:
-        // windText should be formatted, precipText should be "20%", feelsLikeText must be literal em-dash "—"
+        XCTAssertEqual(display.header.conditionSummary, "מעונן חלקית")
+        XCTAssertTrue(display.header.chanceOfRainText.contains("סיכוי לגשם"), "Expected Hebrew chance of rain text")
+        XCTAssertTrue(display.header.highLowText?.contains("גבוה:") == true, "Expected Hebrew high/low label")
+        XCTAssertEqual(display.sourceAttribution, "נתוני מזג אוויר: MET Norway (CC BY 4.0)")
         XCTAssertEqual(display.stats.precipText, "20%")
         XCTAssertEqual(display.stats.feelsLikeText, "—")
         XCTAssertNotEqual(display.stats.windText, "—")
+    }
 
-        // Attribution:
-        XCTAssertEqual(display.sourceAttribution, MOTLocationWeatherSnapshot.attribution)
+    func testWeatherDisplayEnglishLocalizationStrict() {
+        let now = Date()
+        let tz = TimeZone(identifier: "America/New_York")!
+        let locale = Locale(identifier: "en_US")
+        let snapshot = makeSampleSnapshot(now: now)
+
+        let display = WeatherDisplay(
+            locationForecast: snapshot,
+            locationName: "New York",
+            locale: locale,
+            timeZone: tz,
+            now: now,
+            language: "en"
+        )
+
+        XCTAssertNotNil(display)
+        guard let display else { return }
+
+        XCTAssertEqual(display.header.regionName, "New York")
+        XCTAssertEqual(display.hourly.count, 25)
+        XCTAssertEqual(display.hourly.first?.timeLabel, "Now", "Strict English check: must be 'Now', never 'עכשיו'")
+        XCTAssertTrue(display.hourly.first?.isNow == true)
+        XCTAssertEqual(display.header.conditionSummary, "Partly Cloudy")
+        XCTAssertTrue(display.header.chanceOfRainText.contains("Chance of Rain"), "Expected English chance of rain text")
+        XCTAssertTrue(display.header.highLowText?.contains("H:") == true, "Expected English high/low label")
+        XCTAssertEqual(display.sourceAttribution, "Weather data: MET Norway (CC BY 4.0)")
+    }
+
+    func testConditionsLocalizationInBothLanguages() {
+        // Hebrew
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "clear-day", language: "he"), "בהיר")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "clear-night", language: "he"), "בהיר")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "partly-cloudy-day", language: "he"), "מעונן חלקית")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "cloudy", language: "he"), "מעונן")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "rain", language: "he"), "גשם")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "snow", language: "he"), "שלג")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "fog", language: "he"), "ערפל")
+
+        // English
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "clear-day", language: "en"), "Clear")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "clear-night", language: "en"), "Clear")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "partly-cloudy-day", language: "en"), "Partly Cloudy")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "cloudy", language: "en"), "Cloudy")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "rain", language: "en"), "Rain")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "snow", language: "en"), "Snow")
+        XCTAssertEqual(WeatherFormatter.conditionText(for: "fog", language: "en"), "Fog")
+    }
+
+    func testAttributionLocalizationStrict() {
+        XCTAssertEqual(MOTLocationWeatherSnapshot.attribution(language: "he"), "נתוני מזג אוויר: MET Norway (CC BY 4.0)")
+        XCTAssertEqual(MOTLocationWeatherSnapshot.attribution(language: "en"), "Weather data: MET Norway (CC BY 4.0)")
     }
 
     func testTimeFormattingWithExplicitTimeZone() {
@@ -88,7 +142,6 @@ final class OneBusAwayWeatherTests: XCTestCase {
         let nyTZ = TimeZone(identifier: "America/New_York")!
         let locale = Locale(identifier: "en_US")
 
-        // 14:00 UTC = 17:00 in Jerusalem (+3 DST) and 10:00 in New York (-4 EDT)
         let jerusalemTime = WeatherFormatter.formatTime(date, locale: locale, timeZone: jerusalemTZ)
         let nyTime = WeatherFormatter.formatTime(date, locale: locale, timeZone: nyTZ)
 
@@ -96,23 +149,19 @@ final class OneBusAwayWeatherTests: XCTestCase {
         XCTAssertTrue(nyTime.contains("10"), "Expected 10 AM for NY, got \(nyTime)")
     }
 
-    func testHebrewLocalizationResourcesLoaded() {
-        guard let hebrewPath = Bundle.module.path(forResource: "he", ofType: "lproj"),
-              let heBundle = Bundle(path: hebrewPath) else {
-            XCTFail("Missing he.lproj in OneBusAwayWeather bundle")
+    func testHebrewAndEnglishLocalizationResourcesLoaded() {
+        guard let heCorePath = Bundle.module.path(forResource: "he", ofType: "lproj"),
+              let heBundle = Bundle(path: heCorePath),
+              let enCorePath = Bundle.module.path(forResource: "en", ofType: "lproj"),
+              let enBundle = Bundle(path: enCorePath) else {
+            XCTFail("Missing he.lproj or en.lproj in OneBusAwayWeatherCore bundle")
             return
         }
 
-        let nowLabel = heBundle.localizedString(forKey: "weather.now", value: nil, table: nil)
-        XCTAssertEqual(nowLabel, "עכשיו")
+        XCTAssertEqual(heBundle.localizedString(forKey: "weather.condition.clear", value: nil, table: nil), "בהיר")
+        XCTAssertEqual(enBundle.localizedString(forKey: "weather.condition.clear", value: nil, table: nil), "Clear")
 
-        let rainFormat = heBundle.localizedString(forKey: "weather.chance_of_rain_format", value: nil, table: nil)
-        XCTAssertTrue(rainFormat.contains("סיכוי לגשם"))
-
-        let feelsLike = heBundle.localizedString(forKey: "weather.stat.feels_like", value: nil, table: nil)
-        XCTAssertEqual(feelsLike, "מרגיש כמו")
-
-        let windSpeed = heBundle.localizedString(forKey: "weather.stat.wind", value: nil, table: nil)
-        XCTAssertEqual(windSpeed, "מהירות רוח")
+        XCTAssertEqual(heBundle.localizedString(forKey: "common.close", value: nil, table: nil), "סגור")
+        XCTAssertEqual(enBundle.localizedString(forKey: "common.close", value: nil, table: nil), "Close")
     }
 }

@@ -1,3 +1,81 @@
+"app_name" = "Zmanim";
 "today" = "Today";
 "notifications" = "Notifications";
-"next_zman" = "Next zman";
+"next_zman" = "Next Zman";
+"daily_zmanim" = "Daily Zmanim";
+"tomorrow" = "Tomorrow";
+"now" = "Now";
+"sunrise" = "Sunrise";
+"sunset" = "Sunset";
+"zmanim_data_source" = "Zmanim data courtesy of Hebcal.com";
+"no_zmanim_data" = "No zmanim data available";
+
+"remaining.now" = "Now";
+"remaining.minutes_format" = "In %d min";
+"remaining.hours_format" = "In %d hr";
+"remaining.hours_minutes_format" = "In %1$d hr %2$d min";
+
+"location.current" = "Current Location";
+"location.fixed" = "Fixed City";
+
+"settings.personal_alerts" = "✦  Personal Alerts  ✦";
+"settings.my_notifications" = "My Notifications";
+"settings.notifications_desc" = "Enable the alerts you want and choose how many minutes in advance to receive each.";
+"settings.send_test_alert" = "Send Test Alert";
+"settings.my_city" = "My City";
+"settings.location_source" = "Location Source";
+"settings.search_city" = "Search city or town";
+"settings.shabbat_holiday_alert" = "Shabbat & Holiday Alerts";
+"settings.shabbat_holiday_desc" = "Entry and exit times for your city";
+"settings.shabbat" = "Shabbat";
+"settings.shabbat_desc" = "Candle lighting, Havdalah, and Rabbeinu Tam";
+"settings.holidays_fasts" = "Holidays & Fasts";
+"settings.holidays_fasts_desc" = "Entry and exit of Jewish holidays and fasts";
+"settings.enable_zman_reminder" = "Enable a reminder for any zman.";
+"settings.custom_reminders" = "Custom Reminders";
+"settings.custom_reminders_desc" = "A reminder with your custom name, anchored to a chosen zman.";
+"settings.reminder_name_placeholder" = "Reminder name (e.g. Put on tefillin)";
+"settings.base_zman" = "Base Zman";
+"settings.add_reminder" = "Add Reminder";
+"settings.save_settings" = "Save Settings";
+"settings.exact_time" = "At exact time";
+"settings.minutes_before_format" = "%d min before";
+"settings.minutes_after_format" = "%d min after";
+"settings.debug_diagnostics" = "Diagnostics (DEBUG)";
+
+"notification.snooze_5_min" = "Snooze 5 min";
+"notification.open_zmanim" = "Open Zmanim";
+"notification.time_reminder" = "Time Reminder";
+"notification.time_arrived" = "Time has arrived";
+"notification.time_arrived_time" = "Time has arrived · %@";
+"notification.in_minutes_format" = "In %d minutes";
+"notification.minutes_ago_format" = "%d minutes ago";
+"notification.minutes_before_format" = "%1$d min before · %2$@";
+"notification.minutes_after_format" = "%1$d min after · %2$@";
+"notification.test_title" = "Sunset in 15 minutes";
+"notification.test_body" = "Sunset today at 18:21";
+
+"widget.display_name" = "Daily Zmanim";
+"widget.description" = "Next zman, solar arc, and daily zmanim paging.";
+"widget.no_data" = "No Data";
+"widget.open_app_to_refresh" = "Open app to refresh";
+"widget.location_required" = "Location access required in widget";
+"widget.permission_required" = "Location permission required";
+"widget.updated_at_format" = "Updated at %@";
+"widget.open_app_to_refresh_city_format" = "Open app to refresh %@";
+"widget.intent.next_page_title" = "Next Widget Page";
+"widget.intent.next_page_desc" = "Pages to the next five zmanim in the widget.";
+"widget.intent.prev_page_title" = "Previous Widget Page";
+"widget.intent.prev_page_desc" = "Pages to the previous five zmanim in the widget.";
+"widget.intent.toggle_reminder_title" = "Toggle Quick Reminder";
+"widget.intent.open_zmanim_title" = "Open Zmanim";
+"widget.a11y.previous_page" = "Back to previous five zmanim";
+"widget.a11y.next_page" = "Forward to next five zmanim";
+
+"weather.source_attribution" = "Weather data: MET Norway (CC BY 4.0)";
+"weather.header_a11y_format" = "Weather forecast for %1$@: %2$@, %3$@";
+"weather.header_a11y_hint" = "Double tap to open detailed forecast card";
+
+"error.invalid_url" = "Unable to construct Hebcal request.";
+"error.invalid_response_format" = "Hebcal returned error %d.";
+"error.empty_data" = "No data received from Hebcal.";

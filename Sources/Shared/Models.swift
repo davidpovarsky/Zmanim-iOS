@@ -16,6 +16,18 @@ public struct ZmanItem: Identifiable, Codable, Hashable, Sendable {
         self.date = date
         self.id = "\(key)-\(Int(date.timeIntervalSince1970))"
     }
+
+    public func localizedTitle(locale: Locale = .autoupdatingCurrent) -> String {
+        let lang = locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")
+        if lang == "en" && !englishTitle.isEmpty {
+            return englishTitle
+        }
+        return hebrewTitle
+    }
+
+    public var displayTitle: String {
+        localizedTitle()
+    }
 }
 
 public struct ZmanDefinition: Hashable, Sendable {
@@ -30,12 +42,27 @@ public struct ZmanDefinition: Hashable, Sendable {
         self.englishTitle = englishTitle
         self.icon = icon
     }
+
+    public func localizedTitle(locale: Locale = .autoupdatingCurrent) -> String {
+        let lang = locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")
+        if lang == "en" && !englishTitle.isEmpty {
+            return englishTitle
+        }
+        return hebrewTitle
+    }
 }
 
 public enum LocationMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case current, fixed
     public var id: String { rawValue }
-    public var title: String { self == .current ? "המיקום הנוכחי" : "עיר קבועה" }
+    public var title: String {
+        switch self {
+        case .current:
+            return NSLocalizedString("location.current", value: "המיקום הנוכחי", comment: "")
+        case .fixed:
+            return NSLocalizedString("location.fixed", value: "עיר קבועה", comment: "")
+        }
+    }
 }
 
 public struct NotificationRule: Identifiable, Codable, Hashable, Sendable {

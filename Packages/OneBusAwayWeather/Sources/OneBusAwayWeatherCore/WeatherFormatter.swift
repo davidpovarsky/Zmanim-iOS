@@ -22,24 +22,24 @@ public enum WeatherFormatter {
     private enum ConditionKey {
         case clear, partlyCloudy, cloudy, rain, sleet, snow, wind, fog
 
-        var localizedText: String {
+        func localizedText(language: String? = nil) -> String {
             switch self {
             case .clear:
-                return OBALoc("weather.condition.clear", value: "Clear", comment: "Weather condition label for clear skies.")
+                return OBALoc("weather.condition.clear", value: "Clear", comment: "Weather condition label for clear skies.", language: language)
             case .partlyCloudy:
-                return OBALoc("weather.condition.partly_cloudy", value: "Partly Cloudy", comment: "Weather condition label for partly cloudy skies.")
+                return OBALoc("weather.condition.partly_cloudy", value: "Partly Cloudy", comment: "Weather condition label for partly cloudy skies.", language: language)
             case .cloudy:
-                return OBALoc("weather.condition.cloudy", value: "Cloudy", comment: "Weather condition label for cloudy skies.")
+                return OBALoc("weather.condition.cloudy", value: "Cloudy", comment: "Weather condition label for cloudy skies.", language: language)
             case .rain:
-                return OBALoc("weather.condition.rain", value: "Rain", comment: "Weather condition label for rain.")
+                return OBALoc("weather.condition.rain", value: "Rain", comment: "Weather condition label for rain.", language: language)
             case .sleet:
-                return OBALoc("weather.condition.sleet", value: "Sleet", comment: "Weather condition label for sleet.")
+                return OBALoc("weather.condition.sleet", value: "Sleet", comment: "Weather condition label for sleet.", language: language)
             case .snow:
-                return OBALoc("weather.condition.snow", value: "Snow", comment: "Weather condition label for snow.")
+                return OBALoc("weather.condition.snow", value: "Snow", comment: "Weather condition label for snow.", language: language)
             case .wind:
-                return OBALoc("weather.condition.wind", value: "Windy", comment: "Weather condition label for windy conditions.")
+                return OBALoc("weather.condition.wind", value: "Windy", comment: "Weather condition label for windy conditions.", language: language)
             case .fog:
-                return OBALoc("weather.condition.fog", value: "Fog", comment: "Weather condition label for foggy conditions.")
+                return OBALoc("weather.condition.fog", value: "Fog", comment: "Weather condition label for foggy conditions.", language: language)
             }
         }
     }
@@ -94,8 +94,12 @@ public enum WeatherFormatter {
     /// Localized human-readable condition (e.g. "Clear", "Cloudy"). Day/night
     /// variants collapse to the same word since the icon already conveys time-of-day.
     public static func conditionText(for iconKey: String) -> String {
-        iconMetadata[iconKey]?.conditionKey.localizedText
-            ?? OBALoc("weather.condition.unknown", value: "—", comment: "Weather condition placeholder when the icon key is unknown.")
+        conditionText(for: iconKey, language: nil)
+    }
+
+    public static func conditionText(for iconKey: String, language: String? = nil) -> String {
+        iconMetadata[iconKey]?.conditionKey.localizedText(language: language)
+            ?? OBALoc("weather.condition.unknown", value: "—", comment: "Weather condition placeholder when the icon key is unknown.", language: language)
     }
 
     // MARK: - Temperature
