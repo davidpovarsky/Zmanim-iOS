@@ -187,56 +187,53 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             }
 
             // Request fresh GPS
-            let fetcher = WidgetLocationFetcher()
-            let state = fetcher.currentState
+            let (state, oneShotLocation) = await requestWidgetLocation()
 
-            if case .authorized = state {
-                if let location = await fetcher.requestOneShotLocation(timeoutSeconds: 4.0) {
-                    var resolvedZone: TimeZone? = nil
-                    var resolvedCity: String? = nil
+            if let location = oneShotLocation {
+                var resolvedZone: TimeZone? = nil
+                var resolvedCity: String? = nil
 
-                    if let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location, preferredLocale: Locale.autoupdatingCurrent),
-                       let place = placemarks.first {
-                        resolvedZone = place.timeZone
-                        resolvedCity = place.locality ?? place.subLocality ?? place.administrativeArea
-                    }
+                if let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location, preferredLocale: Locale.autoupdatingCurrent),
+                   let place = placemarks.first {
+                    resolvedZone = place.timeZone
+                    resolvedCity = place.locality ?? place.subLocality ?? place.administrativeArea
+                }
 
-                    let timeZone = resolvedZone ?? cached?.timeZone ?? .current
-                    let cityName = resolvedCity ?? cached?.cityName ?? NSLocalizedString("location.current", value: "המיקום הנוכחי", comment: "")
+                let timeZone = resolvedZone ?? cached?.timeZone ?? .current
+                let cityName = resolvedCity ?? cached?.cityName ?? NSLocalizedString("location.current", value: "המיקום הנוכחי", comment: "")
 
-                    do {
-                        let items = try await HebcalService.fetchDays(
-                            location: location,
-                            timeZone: timeZone,
-                            starting: now,
-                            count: 3
+                do {
+                    let items = try await HebcalService.fetchDays(
+                        location: location,
+                        timeZone: timeZone,
+                        starting: now,
+                        count: 3
+                    )
+                    if !items.isEmpty {
+                        let snapshot = ZmanSnapshot(
+                            cityName: cityName,
+                            timeZoneID: timeZone.identifier,
+                            latitude: location.coordinate.latitude,
+                            longitude: location.coordinate.longitude,
+                            updatedAt: now,
+                            items: items,
+                            locationSignature: "current"
                         )
-                        if !items.isEmpty {
-                            let snapshot = ZmanSnapshot(
-                                cityName: cityName,
-                                timeZoneID: timeZone.identifier,
-                                latitude: location.coordinate.latitude,
-                                longitude: location.coordinate.longitude,
-                                updatedAt: now,
-                                items: items,
-                                locationSignature: "current"
-                            )
-                            LocationSnapshotStore.saveSnapshot(snapshot, for: locationKey)
-                            return makeTimeline(
-                                snapshot: snapshot,
-                                now: now,
-                                state: nil,
-                                pageState: pageState,
-                                isGPS: true,
-                                locationKey: locationKey,
-                                customCityName: cityName
-                            )
-                        }
-                    } catch {
-                        #if DEBUG
-                        Self.logger.error("Widget Hebcal GPS fetch failed: \(error.localizedDescription, privacy: .public)")
-                        #endif
+                        LocationSnapshotStore.saveSnapshot(snapshot, for: locationKey)
+                        return makeTimeline(
+                            snapshot: snapshot,
+                            now: now,
+                            state: nil,
+                            pageState: pageState,
+                            isGPS: true,
+                            locationKey: locationKey,
+                            customCityName: cityName
+                        )
                     }
+                } catch {
+                    #if DEBUG
+                    Self.logger.error("Widget Hebcal GPS fetch failed: \(error.localizedDescription, privacy: .public)")
+                    #endif
                 }
             }
 
@@ -270,6 +267,17 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             let entry = ZmanEntry(date: now, snapshot: nil, state: recoveryMessage, pageIndex: 0, pageCount: 1, isGPS: true, locationKey: locationKey, customCityName: nil)
             return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
         }
+    }
+
+    @MainActor
+    private func requestWidgetLocation() async -> (WidgetLocationFetcher.WidgetLocationState, CLLocation?) {
+        let fetcher = WidgetLocationFetcher()
+        let state = fetcher.currentState
+        if case .authorized = state {
+            let location = await fetcher.requestOneShotLocation(timeoutSeconds: 4.0)
+            return (state, location)
+        }
+        return (state, nil)
     }
 
     private func resolveTarget(from intent: WidgetLocationConfigurationIntent) -> ResolvedWidgetTarget {
