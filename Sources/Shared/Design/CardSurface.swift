@@ -5,7 +5,7 @@ public struct ZmanCardModifier: ViewModifier {
 
     public init() {}
 
-    public var body(content: Content) -> some View {
+    public func body(content: Content) -> some View {
         let cardShape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         content
             .background(

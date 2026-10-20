@@ -12,7 +12,7 @@ public struct GlassSurfaceModifier<S: Shape>: ViewModifier {
         self.isInteractive = isInteractive
     }
 
-    public var body(content: Content) -> some View {
+    public func body(content: Content) -> some View {
         if reduceTransparency {
             content
                 .background(Color.zmanCard, in: shape)
