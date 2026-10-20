@@ -132,12 +132,12 @@ public struct HomeView: View {
     @ViewBuilder
     private func homeBackdrop(date: Date, sunrise: Date?, sunset: Date?) -> some View {
         ZmanimSkyBackdrop(
-            condition: model.weatherModel.condition,
-            cloudCover: model.weatherModel.cloudCover,
-            now: date,
+            date: date,
+            timeZone: model.timeZone,
             sunrise: sunrise,
             sunset: sunset,
-            timeZone: model.timeZone
+            condition: model.weatherModel.condition,
+            cloudCover: model.weatherModel.cloudCover
         )
     }
 
