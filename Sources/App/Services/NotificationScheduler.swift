@@ -204,8 +204,8 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
                     Self.logger.notice("NotificationCoordinator scheduled snooze: \(request.identifier, privacy: .public)")
                 }
                 #endif
-                completionHandler()
                 DispatchQueue.main.async {
+                    completionHandler()
                     if bgTask != .invalid {
                         UIApplication.shared.endBackgroundTask(bgTask)
                         bgTask = .invalid
@@ -216,9 +216,13 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
             #if DEBUG
             Self.logger.notice("NotificationCoordinator openAction selected")
             #endif
-            completionHandler()
+            DispatchQueue.main.async {
+                completionHandler()
+            }
         default:
-            completionHandler()
+            DispatchQueue.main.async {
+                completionHandler()
+            }
         }
     }
 }
