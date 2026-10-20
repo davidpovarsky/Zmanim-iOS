@@ -139,11 +139,8 @@ final class ZmanimUITests: XCTestCase {
         try? expandedScreenshot.pngRepresentation.write(to: tmpExpandedUrl)
 
         // 4. Mandatory assertion: Snooze action button MUST exist
-        guard let snoozeButton = findSnoozeButton(in: springboard) ?? (springboard.buttons["נודניק 5 דק׳"].waitForExistence(timeout: 5) ? springboard.buttons["נודניק 5 דק׳"] : springboard.buttons["Snooze 5 min"]) else {
-            XCTFail("Snooze action button ('נודניק 5 דק׳' or 'Snooze 5 min') must exist on expanded notification")
-            return
-        }
-        XCTAssertTrue(snoozeButton.exists, "Snooze action button must exist on expanded notification")
+        let snoozeButton = findSnoozeButton(in: springboard) ?? (springboard.buttons["נודניק 5 דק׳"].waitForExistence(timeout: 5) ? springboard.buttons["נודניק 5 דק׳"] : springboard.buttons["Snooze 5 min"])
+        XCTAssertTrue(snoozeButton.waitForExistence(timeout: 10), "Snooze action button ('נודניק 5 דק׳' or 'Snooze 5 min') must exist on expanded notification")
 
         // 5. Tap snooze action while app is open in foreground
         snoozeButton.tap()
@@ -203,11 +200,8 @@ final class ZmanimUITests: XCTestCase {
 
         expandBanner(banner, springboard: springboard)
 
-        guard let snoozeButton = findSnoozeButton(in: springboard) ?? (springboard.buttons["נודניק 5 דק׳"].waitForExistence(timeout: 5) ? springboard.buttons["נודניק 5 דק׳"] : springboard.buttons["Snooze 5 min"]) else {
-            XCTFail("Snooze action button must exist while app is in background")
-            return
-        }
-        XCTAssertTrue(snoozeButton.exists, "Snooze action button must exist while app is in background")
+        let snoozeButton = findSnoozeButton(in: springboard) ?? (springboard.buttons["נודניק 5 דק׳"].waitForExistence(timeout: 5) ? springboard.buttons["נודניק 5 דק׳"] : springboard.buttons["Snooze 5 min"])
+        XCTAssertTrue(snoozeButton.waitForExistence(timeout: 10), "Snooze action button must exist while app is in background")
         snoozeButton.tap()
 
         // Mandatory assertion: Containing app must remain alive without crashing after pressing snooze while in background
