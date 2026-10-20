@@ -34,28 +34,68 @@ enum HebcalService {
         var errorDescription: String? {
             switch self {
             case .invalidURL:
-                return "לא ניתן ליצור בקשה ל-Hebcal."
+                return NSLocalizedString("error.invalid_url", comment: "")
             case .invalidResponse(let statusCode):
-                return "Hebcal החזיר שגיאה \(statusCode)."
+                return String(format: NSLocalizedString("error.invalid_response_format", comment: ""), statusCode)
             case .emptyData:
-                return "לא התקבלו נתונים מ-Hebcal."
+                return NSLocalizedString("error.empty_data", comment: "")
             }
         }
     }
 
+    /// Fetches today and tomorrow immediately for quick UI display.
+    static func fetchTodayAndTomorrow(
+        location: CLLocation,
+        timeZone: TimeZone,
+        starting startDate: Date = Date()
+    ) async throws -> [ZmanItem] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        let day0 = startDate
+        guard let day1 = cal.date(byAdding: .day, value: 1, to: startDate) else {
+            return try await fetchDay(location: location, timeZone: timeZone, date: day0)
+        }
+
+        async let items0 = fetchDay(location: location, timeZone: timeZone, date: day0)
+        async let items1 = fetchDay(location: location, timeZone: timeZone, date: day1)
+
+        let combined = try await (items0 + items1)
+        return combined.sorted { $0.date < $1.date }
+    }
+
+    /// Fetches multiple days: front-loads today and tomorrow, then fetches the remaining days concurrently.
     static func fetchDays(
         location: CLLocation,
         timeZone: TimeZone,
         starting startDate: Date = Date(),
         count: Int = 8
     ) async throws -> [ZmanItem] {
-        var all: [ZmanItem] = []
+        guard count > 0 else { return [] }
+        if count <= 2 {
+            return try await fetchTodayAndTomorrow(location: location, timeZone: timeZone, starting: startDate)
+        }
+
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = timeZone
-        for offset in 0..<count {
-            guard let day = cal.date(byAdding: .day, value: offset, to: startDate) else { continue }
-            all += try await fetchDay(location: location, timeZone: timeZone, date: day)
+
+        // Front-load initial 2 days
+        let initialItems = try await fetchTodayAndTomorrow(location: location, timeZone: timeZone, starting: startDate)
+
+        // Fetch remaining days with bounded concurrency
+        var remainingItems: [ZmanItem] = []
+        try await withThrowingTaskGroup(of: [ZmanItem].self) { group in
+            for offset in 2..<count {
+                guard let day = cal.date(byAdding: .day, value: offset, to: startDate) else { continue }
+                group.addTask {
+                    try await fetchDay(location: location, timeZone: timeZone, date: day)
+                }
+            }
+            for try await dayItems in group {
+                remainingItems.append(contentsOf: dayItems)
+            }
         }
+
+        let all = initialItems + remainingItems
         return all.sorted { $0.date < $1.date }
     }
 

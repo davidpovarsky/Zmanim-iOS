@@ -88,13 +88,15 @@ public struct SolarHero: View {
                 .monospacedDigit()
                 .lineLimit(1)
 
-            HStack(spacing: 4) {
-                Image(systemName: "location.fill")
-                Text(city)
+            if !city.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "location.fill")
+                    Text(city)
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
         }
     }
 

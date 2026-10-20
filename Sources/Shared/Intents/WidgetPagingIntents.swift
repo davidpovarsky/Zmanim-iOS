@@ -3,11 +3,11 @@ import Foundation
 import WidgetKit
 
 public struct NextWidgetPageIntent: AppIntent {
-    public static var title: LocalizedStringResource = LocalizedStringResource("widget.intent.next_page_title", defaultValue: "העמוד הבא בווידג'ט")
-    public static var description = IntentDescription(LocalizedStringResource("widget.intent.next_page_desc", defaultValue: "מדפדף לחמשת זמני היום הבאים בווידג'ט."))
+    public static var title: LocalizedStringResource = LocalizedStringResource("widget.intent.next_page_title")
+    public static var description = IntentDescription(LocalizedStringResource("widget.intent.next_page_desc"))
     public static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Location Key")
+    @Parameter(title: LocalizedStringResource("widget.location_param_title"))
     public var locationKey: String?
 
     public init() {
@@ -20,14 +20,23 @@ public struct NextWidgetPageIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult {
         let now = Date()
-        let resolvedKey = locationKey ?? "default"
-        let snapshot = LocationSnapshotStore.loadSnapshot(for: resolvedKey) ?? AppGroupStore.loadSnapshot()
-        let timeZone = snapshot?.timeZone ?? .current
+        let resolvedKey: String
+        if let key = locationKey, key != "default", !key.isEmpty {
+            resolvedKey = key
+        } else {
+            let prefs = LocationPreferencesStore.loadPreferences()
+            resolvedKey = prefs.defaultChoice.storageKey
+        }
+
+        guard let snapshot = LocationSnapshotStore.loadSnapshot(for: resolvedKey), !snapshot.items.isEmpty else {
+            return .result()
+        }
+        let timeZone = snapshot.timeZone
         let dayKey = WidgetPageStateStore.dayKey(for: now, timeZone: timeZone)
         let fingerprint = resolvedKey
 
         let pager = UpcomingZmanPager(
-            allItems: snapshot?.items ?? [],
+            allItems: snapshot.items,
             referenceDate: now,
             timeZone: timeZone
         )
@@ -49,11 +58,11 @@ public struct NextWidgetPageIntent: AppIntent {
 }
 
 public struct PreviousWidgetPageIntent: AppIntent {
-    public static var title: LocalizedStringResource = LocalizedStringResource("widget.intent.prev_page_title", defaultValue: "העמוד הקודם בווידג'ט")
-    public static var description = IntentDescription(LocalizedStringResource("widget.intent.prev_page_desc", defaultValue: "חוזר לחמשת זמני היום הקודמים בווידג'ט."))
+    public static var title: LocalizedStringResource = LocalizedStringResource("widget.intent.prev_page_title")
+    public static var description = IntentDescription(LocalizedStringResource("widget.intent.prev_page_desc"))
     public static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Location Key")
+    @Parameter(title: LocalizedStringResource("widget.location_param_title"))
     public var locationKey: String?
 
     public init() {
@@ -66,14 +75,23 @@ public struct PreviousWidgetPageIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult {
         let now = Date()
-        let resolvedKey = locationKey ?? "default"
-        let snapshot = LocationSnapshotStore.loadSnapshot(for: resolvedKey) ?? AppGroupStore.loadSnapshot()
-        let timeZone = snapshot?.timeZone ?? .current
+        let resolvedKey: String
+        if let key = locationKey, key != "default", !key.isEmpty {
+            resolvedKey = key
+        } else {
+            let prefs = LocationPreferencesStore.loadPreferences()
+            resolvedKey = prefs.defaultChoice.storageKey
+        }
+
+        guard let snapshot = LocationSnapshotStore.loadSnapshot(for: resolvedKey), !snapshot.items.isEmpty else {
+            return .result()
+        }
+        let timeZone = snapshot.timeZone
         let dayKey = WidgetPageStateStore.dayKey(for: now, timeZone: timeZone)
         let fingerprint = resolvedKey
 
         let pager = UpcomingZmanPager(
-            allItems: snapshot?.items ?? [],
+            allItems: snapshot.items,
             referenceDate: now,
             timeZone: timeZone
         )

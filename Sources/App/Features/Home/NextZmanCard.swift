@@ -121,16 +121,16 @@ public struct NextZmanCard: View {
 
     private func formatRemaining(to target: Date, from current: Date) -> String {
         let diff = target.timeIntervalSince(current)
-        guard diff > 0 else { return NSLocalizedString("remaining.now", value: "עכשיו", comment: "") }
+        guard diff > 0 else { return NSLocalizedString("remaining.now", comment: "") }
         let totalMinutes = Int(ceil(diff / 60.0))
         let hours = totalMinutes / 60
         let mins = totalMinutes % 60
         if hours == 0 {
-            return String(format: NSLocalizedString("remaining.minutes_format", value: "בעוד %d דק׳", comment: ""), mins)
+            return String(format: NSLocalizedString("remaining.minutes_format", comment: ""), mins)
         } else if mins == 0 {
-            return String(format: NSLocalizedString("remaining.hours_format", value: "בעוד %d שעות", comment: ""), hours)
+            return String(format: NSLocalizedString("remaining.hours_format", comment: ""), hours)
         } else {
-            return String(format: NSLocalizedString("remaining.hours_minutes_format", value: "בעוד %1$d שעות ו-%2$d דק׳", comment: ""), hours, mins)
+            return String(format: NSLocalizedString("remaining.hours_minutes_format", comment: ""), hours, mins)
         }
     }
 

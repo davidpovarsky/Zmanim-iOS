@@ -5,10 +5,13 @@ import os
 import SwiftUI
 import WidgetKit
 
-enum ResolvedWidgetTarget: Sendable {
+enum ResolvedWidgetTarget: Sendable, Equatable {
     case gps
     case savedCity(SavedCity)
-    case cityRemoved
+    case sharedStoreUnavailable
+    case savedCityMissing(cityID: String)
+    case cityRemoved(cityID: String)
+    case invalidConfiguration
 }
 
 struct ConfigurableZmanProvider: AppIntentTimelineProvider {
@@ -17,13 +20,14 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> ZmanEntry {
         ZmanEntry(
             date: .now,
-            snapshot: demoSnapshot,
+            snapshot: nil,
             state: nil,
             pageIndex: 0,
             pageCount: 1,
             isGPS: false,
             locationKey: "default",
-            customCityName: "ירושלים"
+            customCityName: nil,
+            isPlaceholder: true
         )
     }
 
@@ -35,38 +39,76 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         let target = resolveTarget(from: configuration)
         switch target {
         case .gps:
-            if let cached = LocationSnapshotStore.loadSnapshot(for: "current"), !cached.items.isEmpty {
+            let identity = LocationIdentity.gps
+            if let cached = LocationSnapshotStore.loadSnapshot(for: identity),
+               SnapshotValidator.isFresh(snapshot: cached, for: identity, now: .now) {
                 let pager = UpcomingZmanPager(allItems: cached.items, referenceDate: .now, timeZone: cached.timeZone)
-                return ZmanEntry(date: .now, snapshot: cached, state: nil, pageIndex: 0, pageCount: pager.pageCount, isGPS: true, locationKey: "current", customCityName: cached.cityName)
+                return ZmanEntry(
+                    date: .now,
+                    snapshot: cached,
+                    state: nil,
+                    pageIndex: 0,
+                    pageCount: pager.pageCount,
+                    isGPS: true,
+                    locationKey: identity.canonicalStorageKey,
+                    customCityName: cached.cityName.isEmpty ? nil : cached.cityName
+                )
             }
         case .savedCity(let city):
-            let locationKey = "city_\(city.id)"
-            if let cached = LocationSnapshotStore.loadSnapshot(for: locationKey), !cached.items.isEmpty {
+            let identity = LocationIdentity.savedCity(id: city.id)
+            if let cached = LocationSnapshotStore.loadSnapshot(for: identity),
+               SnapshotValidator.isFresh(snapshot: cached, for: identity, now: .now) {
                 let pager = UpcomingZmanPager(allItems: cached.items, referenceDate: .now, timeZone: cached.timeZone)
-                return ZmanEntry(date: .now, snapshot: cached, state: nil, pageIndex: 0, pageCount: pager.pageCount, isGPS: false, locationKey: locationKey, customCityName: city.name)
+                return ZmanEntry(
+                    date: .now,
+                    snapshot: cached,
+                    state: nil,
+                    pageIndex: 0,
+                    pageCount: pager.pageCount,
+                    isGPS: false,
+                    locationKey: identity.canonicalStorageKey,
+                    customCityName: city.name
+                )
             }
         case .cityRemoved:
             return ZmanEntry(
                 date: .now,
                 snapshot: nil,
-                state: NSLocalizedString("location.city_removed_widget", value: "העיר הוסרה — ערוך את הווידג'ט", comment: ""),
+                state: NSLocalizedString("location.city_removed_widget", comment: ""),
                 pageIndex: 0,
                 pageCount: 1,
                 isGPS: false,
                 locationKey: "removed",
                 customCityName: nil
             )
-        }
-
-        if let fallback = AppGroupStore.loadSnapshot(), !fallback.items.isEmpty {
-            let pager = UpcomingZmanPager(allItems: fallback.items, referenceDate: .now, timeZone: fallback.timeZone)
-            return ZmanEntry(date: .now, snapshot: fallback, state: nil, pageIndex: 0, pageCount: pager.pageCount, isGPS: false, locationKey: "default", customCityName: fallback.cityName)
+        case .sharedStoreUnavailable:
+            return ZmanEntry(
+                date: .now,
+                snapshot: nil,
+                state: NSLocalizedString("widget.shared_store_unavailable", comment: ""),
+                pageIndex: 0,
+                pageCount: 1,
+                isGPS: false,
+                locationKey: "unavailable",
+                customCityName: nil
+            )
+        case .savedCityMissing, .invalidConfiguration:
+            return ZmanEntry(
+                date: .now,
+                snapshot: nil,
+                state: NSLocalizedString("widget.open_app_to_refresh", comment: ""),
+                pageIndex: 0,
+                pageCount: 1,
+                isGPS: false,
+                locationKey: "missing",
+                customCityName: nil
+            )
         }
 
         return ZmanEntry(
             date: .now,
             snapshot: nil,
-            state: NSLocalizedString("widget.open_app_to_refresh", value: "פתח את האפליקציה לרענון", comment: ""),
+            state: NSLocalizedString("widget.open_app_to_refresh", comment: ""),
             pageIndex: 0,
             pageCount: 1,
             isGPS: false,
@@ -81,7 +123,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
 
         switch target {
         case .cityRemoved:
-            let recovery = NSLocalizedString("location.city_removed_widget", value: "העיר הוסרה — ערוך את הווידג'ט", comment: "")
+            let recovery = NSLocalizedString("location.city_removed_widget", comment: "")
             let entry = ZmanEntry(
                 date: now,
                 snapshot: nil,
@@ -94,12 +136,55 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             )
             return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
 
-        case .savedCity(let city):
-            let locationKey = "city_\(city.id)"
-            let pageState = WidgetPageStateStore.loadState(for: locationKey)
-            let cached = LocationSnapshotStore.loadSnapshot(for: locationKey)
+        case .sharedStoreUnavailable:
+            let recovery = NSLocalizedString("widget.shared_store_unavailable", comment: "")
+            let entry = ZmanEntry(
+                date: now,
+                snapshot: nil,
+                state: recovery,
+                pageIndex: 0,
+                pageCount: 1,
+                isGPS: false,
+                locationKey: "unavailable",
+                customCityName: nil
+            )
+            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
 
-            if let cached, isSnapshotFresh(cached, now: now) {
+        case .savedCityMissing:
+            let recovery = NSLocalizedString("widget.city_not_found", comment: "")
+            let entry = ZmanEntry(
+                date: now,
+                snapshot: nil,
+                state: recovery,
+                pageIndex: 0,
+                pageCount: 1,
+                isGPS: false,
+                locationKey: "missing",
+                customCityName: nil
+            )
+            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
+
+        case .invalidConfiguration:
+            let recovery = NSLocalizedString("widget.invalid_configuration", comment: "")
+            let entry = ZmanEntry(
+                date: now,
+                snapshot: nil,
+                state: recovery,
+                pageIndex: 0,
+                pageCount: 1,
+                isGPS: false,
+                locationKey: "invalid",
+                customCityName: nil
+            )
+            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
+
+        case .savedCity(let city):
+            let identity = LocationIdentity.savedCity(id: city.id)
+            let locationKey = identity.canonicalStorageKey
+            let pageState = WidgetPageStateStore.loadState(for: locationKey)
+            let cached = LocationSnapshotStore.loadSnapshot(for: identity)
+
+            if let cached, SnapshotValidator.isFresh(snapshot: cached, for: identity, now: now) {
                 return makeTimeline(
                     snapshot: cached,
                     now: now,
@@ -111,7 +196,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                 )
             }
 
-            // Stale or missing: fetch Hebcal for city coordinates
+            // Missing or stale: fetch Hebcal for city coordinates
             let cityLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
             do {
                 let items = try await HebcalService.fetchDays(
@@ -128,9 +213,10 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                         longitude: city.longitude,
                         updatedAt: now,
                         items: items,
-                        locationSignature: "\(city.name)-\(city.timeZone.identifier)"
+                        locationSignature: "\(city.name)-\(city.timeZone.identifier)",
+                        sourceIdentity: identity
                     )
-                    LocationSnapshotStore.saveSnapshot(snapshot, for: locationKey)
+                    _ = LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
                     return makeTimeline(
                         snapshot: snapshot,
                         now: now,
@@ -147,8 +233,8 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                 #endif
             }
 
-            // Fallback to stale cache if available
-            if let cached, !cached.items.isEmpty {
+            // Fallback to stale cache if available and authentic
+            if let cached, !cached.items.isEmpty, cached.validTimeZone != nil {
                 let note = formatStaleNote(for: cached)
                 return makeTimeline(
                     snapshot: cached,
@@ -163,18 +249,19 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
 
             // Empty state for city
             let recovery = String(
-                format: NSLocalizedString("widget.open_app_to_refresh_city_format", value: "פתח את האפליקציה לרענון %@", comment: ""),
+                format: NSLocalizedString("widget.open_app_to_refresh_city_format", comment: ""),
                 city.name
             )
             let entry = ZmanEntry(date: now, snapshot: nil, state: recovery, pageIndex: 0, pageCount: 1, isGPS: false, locationKey: locationKey, customCityName: city.name)
             return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
 
         case .gps:
-            let locationKey = "current"
+            let identity = LocationIdentity.gps
+            let locationKey = identity.canonicalStorageKey
             let pageState = WidgetPageStateStore.loadState(for: locationKey)
-            let cached = LocationSnapshotStore.loadSnapshot(for: locationKey)
+            let cached = LocationSnapshotStore.loadSnapshot(for: identity)
 
-            if let cached, isSnapshotFresh(cached, now: now) {
+            if let cached, SnapshotValidator.isFresh(snapshot: cached, for: identity, now: now) {
                 return makeTimeline(
                     snapshot: cached,
                     now: now,
@@ -182,7 +269,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                     pageState: pageState,
                     isGPS: true,
                     locationKey: locationKey,
-                    customCityName: cached.cityName
+                    customCityName: cached.cityName.isEmpty ? nil : cached.cityName
                 )
             }
 
@@ -199,46 +286,62 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                     resolvedCity = place.locality ?? place.subLocality ?? place.administrativeArea
                 }
 
-                let timeZone = resolvedZone ?? cached?.timeZone ?? .current
-                let cityName = resolvedCity ?? cached?.cityName ?? NSLocalizedString("location.current", value: "המיקום הנוכחי", comment: "")
-
-                do {
-                    let items = try await HebcalService.fetchDays(
-                        location: location,
-                        timeZone: timeZone,
-                        starting: now,
-                        count: 3
-                    )
-                    if !items.isEmpty {
-                        let snapshot = ZmanSnapshot(
-                            cityName: cityName,
-                            timeZoneID: timeZone.identifier,
+                let timeZone = resolvedZone ?? cached?.validTimeZone
+                if let timeZone {
+                    if let resolvedCity, !resolvedCity.isEmpty {
+                        let locality = VerifiedLocality(
+                            name: resolvedCity,
                             latitude: location.coordinate.latitude,
                             longitude: location.coordinate.longitude,
-                            updatedAt: now,
-                            items: items,
-                            locationSignature: "current"
+                            timeZoneID: timeZone.identifier,
+                            localeIdentifier: Locale.autoupdatingCurrent.identifier
                         )
-                        LocationSnapshotStore.saveSnapshot(snapshot, for: locationKey)
-                        return makeTimeline(
-                            snapshot: snapshot,
-                            now: now,
-                            state: nil,
-                            pageState: pageState,
-                            isGPS: true,
-                            locationKey: locationKey,
-                            customCityName: cityName
-                        )
+                        VerifiedLocalityStore.save(locality)
                     }
-                } catch {
-                    #if DEBUG
-                    Self.logger.error("Widget Hebcal GPS fetch failed: \(error.localizedDescription, privacy: .public)")
-                    #endif
+
+                    let verifiedCityName = resolvedCity
+                        ?? VerifiedLocalityStore.load(for: location.coordinate)?.name
+                        ?? (cached?.cityName.isEmpty == false ? cached?.cityName : nil)
+
+                    do {
+                        let items = try await HebcalService.fetchDays(
+                            location: location,
+                            timeZone: timeZone,
+                            starting: now,
+                            count: 3
+                        )
+                        if !items.isEmpty {
+                            let snapshot = ZmanSnapshot(
+                                cityName: verifiedCityName ?? "",
+                                timeZoneID: timeZone.identifier,
+                                latitude: location.coordinate.latitude,
+                                longitude: location.coordinate.longitude,
+                                updatedAt: now,
+                                items: items,
+                                locationSignature: "current",
+                                sourceIdentity: identity
+                            )
+                            _ = LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
+                            return makeTimeline(
+                                snapshot: snapshot,
+                                now: now,
+                                state: nil,
+                                pageState: pageState,
+                                isGPS: true,
+                                locationKey: locationKey,
+                                customCityName: verifiedCityName
+                            )
+                        }
+                    } catch {
+                        #if DEBUG
+                        Self.logger.error("Widget Hebcal GPS fetch failed: \(error.localizedDescription, privacy: .public)")
+                        #endif
+                    }
                 }
             }
 
-            // Stale cache fallback
-            if let cached, !cached.items.isEmpty {
+            // Stale cache fallback for GPS
+            if let cached, !cached.items.isEmpty, cached.validTimeZone != nil {
                 let note = formatStaleNote(for: cached)
                 return makeTimeline(
                     snapshot: cached,
@@ -247,7 +350,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                     pageState: pageState,
                     isGPS: true,
                     locationKey: locationKey,
-                    customCityName: cached.cityName
+                    customCityName: cached.cityName.isEmpty ? nil : cached.cityName
                 )
             }
 
@@ -255,13 +358,13 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             let recoveryMessage: String
             switch state {
             case .appAuthorizedWidgetDenied:
-                recoveryMessage = NSLocalizedString("widget.location_required", value: "יש לאשר מיקום בווידג'ט", comment: "")
+                recoveryMessage = NSLocalizedString("widget.location_required", comment: "")
             case .deniedOrRestricted:
-                recoveryMessage = NSLocalizedString("widget.permission_required", value: "נדרשת הרשאת מיקום", comment: "")
+                recoveryMessage = NSLocalizedString("widget.permission_required", comment: "")
             case .notDetermined:
-                recoveryMessage = NSLocalizedString("widget.open_app_to_refresh", value: "פתח את האפליקציה לרענון", comment: "")
+                recoveryMessage = NSLocalizedString("widget.open_app_to_refresh", comment: "")
             default:
-                recoveryMessage = NSLocalizedString("widget.no_data", value: "אין נתוני זמנים זמינים", comment: "")
+                recoveryMessage = NSLocalizedString("widget.no_data", comment: "")
             }
 
             let entry = ZmanEntry(date: now, snapshot: nil, state: recoveryMessage, pageIndex: 0, pageCount: 1, isGPS: true, locationKey: locationKey, customCityName: nil)
@@ -281,7 +384,19 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
     }
 
     private func resolveTarget(from intent: WidgetLocationConfigurationIntent) -> ResolvedWidgetTarget {
-        let prefs = LocationPreferencesStore.loadPreferences()
+        let prefsResult = LocationPreferencesStore.loadPreferencesResult()
+        let prefs: LocationPreferences
+        switch prefsResult {
+        case .loaded(let loaded):
+            prefs = loaded
+        case .noPreferencesYet:
+            prefs = LocationPreferences()
+        case .storeUnavailable:
+            return .sharedStoreUnavailable
+        case .corruptData:
+            return .invalidConfiguration
+        }
+
         guard let locationParam = intent.location else {
             // Intent is unconfigured: follow app default
             return resolveAppDefault(prefs: prefs)
@@ -296,8 +411,10 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             let cityId = String(paramId.dropFirst("city:".count))
             if let city = prefs.savedCities.first(where: { $0.id == cityId }) {
                 return .savedCity(city)
+            } else if prefs.removedCityIDs.contains(cityId) {
+                return .cityRemoved(cityID: cityId)
             } else {
-                return .cityRemoved
+                return .savedCityMissing(cityID: cityId)
             }
         }
 
@@ -311,8 +428,10 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         case .savedCity(let id):
             if let city = prefs.savedCities.first(where: { $0.id == id }) {
                 return .savedCity(city)
+            } else if prefs.removedCityIDs.contains(id) {
+                return .cityRemoved(cityID: id)
             } else {
-                return .gps
+                return .savedCityMissing(cityID: id)
             }
         }
     }
@@ -321,16 +440,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         formatter.timeZone = snapshot.timeZone
-        return String(format: NSLocalizedString("widget.updated_at_format", value: "עודכן ב-%@", comment: ""), formatter.string(from: snapshot.updatedAt))
-    }
-
-    private func isSnapshotFresh(_ snapshot: ZmanSnapshot, now: Date) -> Bool {
-        guard !snapshot.items.isEmpty else { return false }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = snapshot.timeZone
-        let isToday = cal.isDate(snapshot.updatedAt, inSameDayAs: now)
-        let hasUpcoming = snapshot.items.contains(where: { $0.date > now })
-        return isToday && hasUpcoming
+        return String(format: NSLocalizedString("widget.updated_at_format", comment: ""), formatter.string(from: snapshot.updatedAt))
     }
 
     private func makeTimeline(
@@ -346,7 +456,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         cal.timeZone = snapshot.timeZone
 
         let dayKey = WidgetPageStateStore.dayKey(for: now, timeZone: snapshot.timeZone)
-        let pager = UpcomingZmanPager(
+        let initialPager = UpcomingZmanPager(
             allItems: snapshot.items,
             referenceDate: now,
             timeZone: snapshot.timeZone
@@ -357,7 +467,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             currentDate: now,
             currentDayKey: dayKey,
             currentLocationFingerprint: locationKey,
-            pageCount: pager.pageCount
+            pageCount: initialPager.pageCount
         )
 
         var timePoints: [(date: Date, page: Int)] = [(now, effectivePage)]
@@ -398,13 +508,20 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             }
         }
 
+        // Compute page count and coherent pager per individual entry date
         let entries = uniquePoints.map { pt in
-            ZmanEntry(
+            let entryPager = UpcomingZmanPager(
+                allItems: snapshot.items,
+                referenceDate: pt.date,
+                timeZone: snapshot.timeZone
+            )
+            let safePage = min(pt.page, max(0, entryPager.pageCount - 1))
+            return ZmanEntry(
                 date: pt.date,
                 snapshot: snapshot,
                 state: state,
-                pageIndex: pt.page,
-                pageCount: pager.pageCount,
+                pageIndex: safePage,
+                pageCount: entryPager.pageCount,
                 expiresAt: pageState?.expiresAt,
                 isGPS: isGPS,
                 locationKey: locationKey,
@@ -424,25 +541,6 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         }
 
         return Timeline(entries: entries, policy: reloadPolicy)
-    }
-
-    private var demoSnapshot: ZmanSnapshot {
-        let now = Date()
-        return ZmanSnapshot(
-            cityName: "ירושלים",
-            timeZoneID: TimeZone(identifier: "Asia/Jerusalem")?.identifier ?? TimeZone.current.identifier,
-            latitude: 31.778,
-            longitude: 35.235,
-            updatedAt: now,
-            items: [
-                ZmanItem(key: "alotHaShachar", hebrewTitle: "עלות השחר", englishTitle: "Alot HaShachar", icon: "moon.stars.fill", date: now.addingTimeInterval(-10800)),
-                ZmanItem(key: "sunrise", hebrewTitle: "הנץ החמה", englishTitle: "Sunrise", icon: "sunrise.fill", date: now.addingTimeInterval(-7200)),
-                ZmanItem(key: "chatzot", hebrewTitle: "חצות היום", englishTitle: "Chatzot", icon: "sun.max.fill", date: now.addingTimeInterval(3600)),
-                ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: now.addingTimeInterval(7200)),
-                ZmanItem(key: "tzeit7083deg", hebrewTitle: "צאת הכוכבים", englishTitle: "Tzeit", icon: "moon.fill", date: now.addingTimeInterval(9000))
-            ],
-            locationSignature: "demo"
-        )
     }
 }
 

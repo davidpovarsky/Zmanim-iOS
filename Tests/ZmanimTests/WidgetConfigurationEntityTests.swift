@@ -28,8 +28,8 @@ final class WidgetConfigurationEntityTests: XCTestCase {
     }
 
     func testDeletedCityResolvesToTombstone() async throws {
-        // Clear saved cities
-        LocationPreferencesStore.savePreferences(LocationPreferences(defaultChoice: .current, savedCities: []))
+        // Save preferences where city was explicitly removed
+        LocationPreferencesStore.savePreferences(LocationPreferences(defaultChoice: .current, savedCities: [], schemaVersion: 1, removedCityIDs: ["nonexistent-city-id"]))
 
         let query = WidgetLocationQuery()
         let resolved = try await query.entities(for: ["city:nonexistent-city-id"])

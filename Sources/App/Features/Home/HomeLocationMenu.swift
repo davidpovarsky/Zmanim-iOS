@@ -42,7 +42,7 @@ public struct HomeLocationMenu: View {
                         Image(systemName: "checkmark")
                     }
                     if defaultChoice.isCurrent {
-                        Text("(\(NSLocalizedString("location.default", value: "ברירת מחדל", comment: "")))")
+                        Text("(\(NSLocalizedString("location.default", comment: "")))")
                     }
                 }
             }
@@ -61,7 +61,7 @@ public struct HomeLocationMenu: View {
                                 Image(systemName: "checkmark")
                             }
                             if defaultChoice.savedCityID == city.id {
-                                Text("(\(NSLocalizedString("location.default", value: "ברירת מחדל", comment: "")))")
+                                Text("(\(NSLocalizedString("location.default", comment: "")))")
                             }
                         }
                     }
@@ -77,12 +77,22 @@ public struct HomeLocationMenu: View {
                 Label(LocalizedStringKey("location.add_city"), systemImage: "plus")
             }
         } label: {
+            let labelText: String = {
+                if !currentCityName.isEmpty {
+                    return currentCityName
+                }
+                if isGPSActive {
+                    return NSLocalizedString("location.current", comment: "")
+                }
+                return NSLocalizedString("location.locating", comment: "")
+            }()
+
             HStack(spacing: 4) {
                 if isGPSActive {
                     Image(systemName: "location.fill")
                         .font(.caption)
                 }
-                Text(currentCityName)
+                Text(labelText)
                     .font(.subheadline.bold())
                     .lineLimit(1)
                 Image(systemName: "chevron.down")
@@ -95,6 +105,11 @@ public struct HomeLocationMenu: View {
             .frame(minHeight: 44)
         }
         .menuStyle(.borderlessButton)
-        .accessibilityLabel(String(format: NSLocalizedString("location.menu_a11y", value: "מיקום נוכחי: %@. הקש לשינוי מיקום.", comment: ""), currentCityName))
+        .accessibilityLabel(
+            String(
+                format: NSLocalizedString("location.menu_a11y", comment: ""),
+                currentCityName.isEmpty ? (isGPSActive ? NSLocalizedString("location.current", comment: "") : NSLocalizedString("location.locating", comment: "")) : currentCityName
+            )
+        )
     }
 }

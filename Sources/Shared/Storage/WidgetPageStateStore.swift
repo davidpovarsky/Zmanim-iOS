@@ -51,10 +51,6 @@ public enum WidgetPageStateStore {
                 logger.error("Failed to decode WidgetPageState: \(error.localizedDescription, privacy: .public)")
             }
         }
-        // Fallback to baseKey if custom key not found
-        if key != baseKey, let data = defaults.data(forKey: baseKey) {
-            return try? JSONDecoder().decode(WidgetPageState.self, from: data)
-        }
         return nil
     }
 
@@ -65,10 +61,6 @@ public enum WidgetPageStateStore {
         do {
             let data = try JSONEncoder().encode(state)
             defaults.set(data, forKey: key)
-            if key != baseKey {
-                // Also update baseKey for backward compatibility
-                defaults.set(data, forKey: baseKey)
-            }
             return true
         } catch {
             logger.error("Failed to encode WidgetPageState: \(error.localizedDescription, privacy: .public)")
@@ -79,9 +71,6 @@ public enum WidgetPageStateStore {
     public static func resetState(for locationKey: String = "default") {
         let key = storageKey(for: locationKey)
         defaults?.removeObject(forKey: key)
-        if key != baseKey {
-            defaults?.removeObject(forKey: baseKey)
-        }
     }
 
     /// Formats a stable day key YYYY-MM-DD in the specified timeZone.

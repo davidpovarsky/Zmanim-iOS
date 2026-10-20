@@ -101,9 +101,34 @@
 "widget.a11y.next_page" = "עבור לחמשת הזמנים הבאים";
 
 "weather.source_attribution" = "נתוני מזג אוויר: MET Norway (CC BY 4.0)";
-"weather.header_a11y_format" = "תחזית מזג אוויר עבור %1$@: %2$@, %3$@";
+"weather.header_a11y_format" = "תחזית מזג אוויר: %1$@, %2$@";
 "weather.header_a11y_hint" = "הקש לפתיחת כרטיס תחזית מפורט";
 
 "error.invalid_url" = "לא ניתן ליצור בקשה ל-Hebcal.";
 "error.invalid_response_format" = "Hebcal החזיר שגיאה %d.";
 "error.empty_data" = "לא התקבלו נתונים מ-Hebcal.";
+
+"widget.shared_store_unavailable" = "לא ניתן לגשת להגדרות — פתח את האפליקציה";
+"widget.city_not_found" = "העיר לא נמצאה — פתח את האפליקציה";
+"widget.invalid_configuration" = "הגדרת הווידג'ט אינה תקינה — ערוך את הווידג'ט";
+"widget.location_not_found" = "מיקום לא נמצא";
+
+"location.store_unavailable" = "מאגר ההגדרות המשותף אינו נגיש.";
+"location.save_failed" = "שמירת ההגדרות נכשלה.";
+
+"search.no_results" = "לא נמצאו תוצאות לחיפוש.";
+"search.invalid_coords" = "קואורדינטות המיקום אינן תקינות.";
+"search.timezone_not_found" = "לא ניתן לקבוע את אזור הזמן של המיקום.";
+"search.failed_format" = "בחירת המיקום נכשלה: %@";
+
+"notification.shabbat_candle_body" = "כניסת שבת בשעה %@";
+"notification.shabbat_exit_body" = "צאת שבת בשעה %@";
+"notification.shabbat_exit" = "מוצאי שבת";
+"notification.holiday_candle_body" = "כניסת החג בשעה %@";
+
+"weather.error.invalid_coordinates" = "קואורדינטות מיקום שגויות.";
+"weather.error.invalid_url" = "לא ניתן ליצור כתובת לבקשת מזג האוויר.";
+"weather.error.server_error_format" = "שירות מזג האוויר החזיר שגיאה %d.";
+"weather.error.empty_data" = "לא התקבלו נתוני תחזית משירות מזג האוויר.";
+"weather.error.decoding_failed_format" = "פענוח נתוני מזג האוויר נכשל: %@";
+

@@ -25,13 +25,18 @@ public struct SavedCity: Identifiable, Codable, Hashable, Sendable {
         self.order = order
     }
 
+    public var validTimeZone: TimeZone? {
+        TimeZone(identifier: timeZoneID)
+    }
+
     public var timeZone: TimeZone {
-        TimeZone(identifier: timeZoneID) ?? .current
+        validTimeZone ?? .current
     }
 
     public var isValid: Bool {
         latitude >= -90.0 && latitude <= 90.0 &&
         longitude >= -180.0 && longitude <= 180.0 &&
-        !name.isEmpty
+        !name.isEmpty &&
+        validTimeZone != nil
     }
 }

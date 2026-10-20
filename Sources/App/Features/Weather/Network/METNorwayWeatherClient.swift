@@ -13,15 +13,15 @@ public enum METWeatherError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .invalidCoordinates:
-            return "קואורדינטות מיקום שגויות."
+            return NSLocalizedString("weather.error.invalid_coordinates", comment: "")
         case .invalidURL:
-            return "לא ניתן ליצור כתובת לבקשת מזג האוויר."
+            return NSLocalizedString("weather.error.invalid_url", comment: "")
         case .serverError(let code):
-            return "שירות מזג האוויר החזיר שגיאה \(code)."
+            return String(format: NSLocalizedString("weather.error.server_error_format", comment: ""), code)
         case .emptyData:
-            return "לא התקבלו נתוני תחזית משירות מזג האוויר."
+            return NSLocalizedString("weather.error.empty_data", comment: "")
         case .decodingFailed(let reason):
-            return "פענוח נתוני מזג האוויר נכשל: \(reason)"
+            return String(format: NSLocalizedString("weather.error.decoding_failed_format", comment: ""), reason)
         }
     }
 }
@@ -105,7 +105,7 @@ public actor METNorwayWeatherClient {
         // Handle 304 Not Modified
         if http.statusCode == 304 {
             let expiresAt = Self.parseExpiresDate(from: http)
-            await cache.refreshExpiration(newExpiresAt: expiresAt)
+            await cache.refreshExpiration(latitude: latitude, longitude: longitude, newExpiresAt: expiresAt)
             if let cached = await cache.getCached(
                 latitude: latitude,
                 longitude: longitude,
@@ -114,6 +114,8 @@ public actor METNorwayWeatherClient {
             ) {
                 return cached
             }
+            // If 304 received but no cached response was found, retry with full unconditional request
+            return try await fetchForecast(latitude: latitude, longitude: longitude, timeZone: timeZone, force: true)
         }
 
         guard http.statusCode == 200 else {

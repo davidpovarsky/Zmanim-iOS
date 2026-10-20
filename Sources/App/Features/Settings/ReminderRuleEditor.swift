@@ -102,19 +102,19 @@ public struct ReminderRuleEditor: View {
 
     private var offsetText: String {
         if rule.offsetMinutes == 0 {
-            return NSLocalizedString("settings.exact_time", value: "במדויק", comment: "")
+            return NSLocalizedString("settings.exact_time", comment: "")
         } else if rule.offsetMinutes < 0 {
-            return String(format: NSLocalizedString("settings.minutes_before_format", value: "%d דק׳ לפני", comment: ""), abs(rule.offsetMinutes))
+            return String(format: NSLocalizedString("settings.minutes_before_format", comment: ""), abs(rule.offsetMinutes))
         } else {
-            return String(format: NSLocalizedString("settings.minutes_after_format", value: "%d דק׳ אחרי", comment: ""), abs(rule.offsetMinutes))
+            return String(format: NSLocalizedString("settings.minutes_after_format", comment: ""), abs(rule.offsetMinutes))
         }
     }
 
     private func presetLabel(_ value: Int) -> String {
         if value == 0 {
-            return NSLocalizedString("settings.exact_time", value: "במדויק", comment: "")
+            return NSLocalizedString("settings.exact_time", comment: "")
         } else {
-            return String(format: NSLocalizedString("settings.minutes_before_format", value: "%d דק׳ לפני", comment: ""), abs(value))
+            return String(format: NSLocalizedString("settings.minutes_before_format", comment: ""), abs(value))
         }
     }
 }

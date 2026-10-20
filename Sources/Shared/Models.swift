@@ -57,12 +57,11 @@ public enum LocationMode: String, Codable, CaseIterable, Identifiable, Sendable 
     public var id: String { rawValue }
 
     public func localizedTitle(locale: Locale = .autoupdatingCurrent) -> String {
-        let isEnglish = (locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")) == "en"
         switch self {
         case .current:
-            return isEnglish ? "Current Location" : "המיקום הנוכחי"
+            return NSLocalizedString("location.current", comment: "")
         case .fixed:
-            return isEnglish ? "Fixed City" : "עיר קבועה"
+            return NSLocalizedString("location.fixed", comment: "")
         }
     }
 
@@ -236,6 +235,10 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
     public var updatedAt: Date
     public var items: [ZmanItem]
     public var locationSignature: String?
+    public var sourceIdentity: LocationIdentity?
+    public var schemaVersion: Int
+    public var coverageStart: Date?
+    public var coverageEnd: Date?
 
     public init(
         cityName: String,
@@ -244,7 +247,11 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
         longitude: Double,
         updatedAt: Date,
         items: [ZmanItem],
-        locationSignature: String? = nil
+        locationSignature: String? = nil,
+        sourceIdentity: LocationIdentity? = nil,
+        schemaVersion: Int = 1,
+        coverageStart: Date? = nil,
+        coverageEnd: Date? = nil
     ) {
         self.cityName = cityName
         self.timeZoneID = timeZoneID
@@ -253,7 +260,41 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
         self.updatedAt = updatedAt
         self.items = items
         self.locationSignature = locationSignature
+        self.sourceIdentity = sourceIdentity
+        self.schemaVersion = schemaVersion
+        self.coverageStart = coverageStart ?? items.first?.date
+        self.coverageEnd = coverageEnd ?? items.last?.date
     }
 
-    public var timeZone: TimeZone { TimeZone(identifier: timeZoneID) ?? .current }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.cityName = try container.decodeIfPresent(String.self, forKey: .cityName) ?? ""
+        self.timeZoneID = try container.decode(String.self, forKey: .timeZoneID)
+        self.latitude = try container.decode(Double.self, forKey: .latitude)
+        self.longitude = try container.decode(Double.self, forKey: .longitude)
+        self.updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        self.items = try container.decode([ZmanItem].self, forKey: .items)
+        self.locationSignature = try container.decodeIfPresent(String.self, forKey: .locationSignature)
+        self.sourceIdentity = try container.decodeIfPresent(LocationIdentity.self, forKey: .sourceIdentity)
+        self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        self.coverageStart = try container.decodeIfPresent(Date.self, forKey: .coverageStart) ?? items.first?.date
+        self.coverageEnd = try container.decodeIfPresent(Date.self, forKey: .coverageEnd) ?? items.last?.date
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case cityName
+        case timeZoneID
+        case latitude
+        case longitude
+        case updatedAt
+        case items
+        case locationSignature
+        case sourceIdentity
+        case schemaVersion
+        case coverageStart
+        case coverageEnd
+    }
+
+    public var validTimeZone: TimeZone? { TimeZone(identifier: timeZoneID) }
+    public var timeZone: TimeZone { validTimeZone ?? .current }
 }

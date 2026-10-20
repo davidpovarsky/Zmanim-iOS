@@ -81,11 +81,11 @@ public struct CustomReminderCard: View {
 
     private func offsetText(_ v: Int) -> String {
         if v == 0 {
-            return NSLocalizedString("settings.exact_time", value: "במדויק", comment: "")
+            return NSLocalizedString("settings.exact_time", comment: "")
         } else if v < 0 {
-            return String(format: NSLocalizedString("settings.minutes_before_format", value: "%d דק׳ לפני", comment: ""), abs(v))
+            return String(format: NSLocalizedString("settings.minutes_before_format", comment: ""), abs(v))
         } else {
-            return String(format: NSLocalizedString("settings.minutes_after_format", value: "%d דק׳ אחרי", comment: ""), abs(v))
+            return String(format: NSLocalizedString("settings.minutes_after_format", comment: ""), abs(v))
         }
     }
 }

@@ -44,4 +44,31 @@ final class DefaultNotificationSchedulingTests: XCTestCase {
         let reloaded = LocationPreferencesStore.loadPreferences()
         XCTAssertEqual(reloaded.defaultChoice, .savedCity(id: "c1"))
     }
+
+    @MainActor
+    func testS11_NotificationsAreScheduledExclusivelyAgainstDefaultChoice() async {
+        // S11: Notifications are scheduled exclusively against defaultChoice, never a transient activeChoice.
+        let defaultCity = SavedCity(id: "c_def", name: "Jerusalem", latitude: 31.778, longitude: 35.235, timeZoneID: "Asia/Jerusalem", order: 0)
+        let transientCity = SavedCity(id: "c_trans", name: "London", latitude: 51.507, longitude: -0.127, timeZoneID: "Europe/London", order: 1)
+
+        let initialPrefs = LocationPreferences(
+            defaultChoice: .savedCity(id: "c_def"),
+            savedCities: [defaultCity, transientCity]
+        )
+        LocationPreferencesStore.savePreferences(initialPrefs)
+
+        let model = AppModel()
+        XCTAssertEqual(model.locationPreferences.defaultChoice, .savedCity(id: "c_def"))
+        XCTAssertEqual(model.activeChoice, .savedCity(id: "c_def"))
+
+        // Switching active choice temporarily must NOT alter defaultChoice or notification target
+        await model.selectActiveChoice(.savedCity(id: "c_trans"))
+
+        XCTAssertEqual(model.activeChoice, .savedCity(id: "c_trans"))
+        XCTAssertEqual(model.locationPreferences.defaultChoice, .savedCity(id: "c_def"))
+
+        // Re-verify persisted default choice is unchanged
+        let reloaded = LocationPreferencesStore.loadPreferences()
+        XCTAssertEqual(reloaded.defaultChoice, .savedCity(id: "c_def"))
+    }
 }

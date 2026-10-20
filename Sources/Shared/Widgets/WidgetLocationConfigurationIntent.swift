@@ -2,10 +2,10 @@ import AppIntents
 import Foundation
 
 public struct WidgetLocationConfigurationIntent: WidgetConfigurationIntent {
-    public static var title: LocalizedStringResource = LocalizedStringResource("widget.configuration_title", defaultValue: "הגדרת מיקום הווידג'ט")
-    public static var description = IntentDescription(LocalizedStringResource("widget.configuration_desc", defaultValue: "בחר את מקור המיקום של הווידג'ט: ברירת מחדל, מיקום נוכחי או עיר שמורה."))
+    public static var title: LocalizedStringResource = LocalizedStringResource("widget.configuration_title")
+    public static var description = IntentDescription(LocalizedStringResource("widget.configuration_desc"))
 
-    @Parameter(title: LocalizedStringResource("widget.location_param_title", defaultValue: "מיקום"))
+    @Parameter(title: LocalizedStringResource("widget.location_param_title"))
     public var location: WidgetLocationEntity?
 
     public init() {

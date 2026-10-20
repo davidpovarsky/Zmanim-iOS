@@ -36,7 +36,7 @@ public struct WeatherHeaderButton: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(String(
-                format: NSLocalizedString("weather.header_a11y_format", value: "תחזית מזג אוויר: %1$@, %2$@", comment: ""),
+                format: NSLocalizedString("weather.header_a11y_format", comment: ""),
                 display.buttonTitle, display.header.conditionSummary
             ))
             .accessibilityHint(Text("weather.header_a11y_hint"))

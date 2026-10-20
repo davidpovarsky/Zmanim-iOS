@@ -6,7 +6,7 @@ import WidgetKit
 
 @MainActor
 public final class AppModel: ObservableObject {
-    @Published public var cityName = NSLocalizedString("location.locating", value: "מאתר מיקום…", comment: "")
+    @Published public var cityName: String = ""
     @Published public var timeZone = TimeZone.current
     @Published public var todayItems: [ZmanItem] = []
     @Published public var allItems: [ZmanItem] = []
@@ -21,6 +21,7 @@ public final class AppModel: ObservableObject {
     let locationService = LocationService()
     private var currentLocation: CLLocation?
     private var loadGeneration: Int = 0
+    private var activeLoadTask: Task<Void, Never>?
 
     public init() {
         let prefs = LocationPreferencesStore.loadPreferences()
@@ -28,15 +29,17 @@ public final class AppModel: ObservableObject {
         activeChoice = prefs.defaultChoice
         isGPSActive = prefs.defaultChoice.isCurrent
 
-        // Populate initial display from stored snapshot
-        let initialStorageKey = prefs.defaultChoice.storageKey
-        let snapshot = LocationSnapshotStore.loadSnapshot(for: initialStorageKey) ?? AppGroupStore.loadSnapshot()
-        if let snapshot, !snapshot.items.isEmpty {
+        // Populate initial display strictly from validated stored snapshot for the default choice
+        let initialTarget = prefs.defaultChoice.identity
+        if let snapshot = LocationSnapshotStore.loadSnapshot(for: initialTarget),
+           !snapshot.items.isEmpty,
+           let validZone = snapshot.validTimeZone {
             cityName = snapshot.cityName
-            let loadedZone = TimeZone(identifier: snapshot.timeZoneID) ?? .current
-            timeZone = loadedZone
+            timeZone = validZone
             allItems = snapshot.items
-            todayItems = ZmanDayResolver.itemsForDay(from: snapshot.items, date: Date(), timeZone: loadedZone)
+            todayItems = ZmanDayResolver.itemsForDay(from: snapshot.items, date: Date(), timeZone: validZone)
+        } else {
+            cityName = ""
         }
 
         #if DEBUG
@@ -113,31 +116,36 @@ public final class AppModel: ObservableObject {
         case .savedCity(let id):
             isGPSActive = false
             if let city = locationPreferences.city(for: id) {
-                Task { await loadSavedCity(city, force: false) }
+                activeLoadTask?.cancel()
+                loadGeneration += 1
+                let gen = loadGeneration
+                activeLoadTask = Task { await loadSavedCity(city, force: false, gen: gen) }
             } else {
-                // If saved city not found, fallback to current
                 activeChoice = .current
                 isGPSActive = true
                 locationService.start()
             }
         }
 
-        // Reschedule notifications for the persistent default choice
+        // Reschedule notifications strictly for the persistent default choice
         Task {
             await rescheduleNotificationsForDefaultLocation()
         }
     }
 
     public func refresh() {
-        Task {
-            await refreshWeather(force: true)
-        }
         switch activeChoice {
         case .current:
             locationService.refresh()
+            Task {
+                await refreshWeather(force: true)
+            }
         case .savedCity(let id):
             if let city = locationPreferences.city(for: id) {
-                Task { await loadSavedCity(city, force: true) }
+                activeLoadTask?.cancel()
+                loadGeneration += 1
+                let gen = loadGeneration
+                activeLoadTask = Task { await loadSavedCity(city, force: true, gen: gen) }
             }
         }
     }
@@ -145,24 +153,60 @@ public final class AppModel: ObservableObject {
     // MARK: - Switching Locations
 
     /// Temporarily selects a location choice for viewing on the Home screen.
-    /// Does NOT alter the persistent default choice or reschedule notifications.
+    /// Immediately cancels pending tasks, updates generation, and decouples default choice.
     public func selectActiveChoice(_ choice: LocationChoice) async {
         guard choice != activeChoice else { return }
+        loadGeneration += 1
+        let gen = loadGeneration
+        activeLoadTask?.cancel()
+
         activeChoice = choice
+        errorMessage = nil
 
         switch choice {
         case .current:
             isGPSActive = true
             weatherModel.resetForLocationChange()
             currentLocation = nil
-            cityName = NSLocalizedString("location.updating", value: "מעדכן מיקום…", comment: "")
+            cityName = ""
+            todayItems = []
+            allItems = []
+
+            // Check if valid cached GPS snapshot exists
+            if let cached = LocationSnapshotStore.loadSnapshot(for: .gps),
+               SnapshotValidator.isFresh(snapshot: cached, for: .gps, now: Date()) {
+                cityName = cached.cityName
+                timeZone = cached.timeZone
+                allItems = cached.items
+                todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: cached.timeZone)
+                currentLocation = CLLocation(latitude: cached.latitude, longitude: cached.longitude)
+                Task { await refreshWeather(force: false) }
+            }
+
             locationService.start()
 
         case .savedCity(let id):
             isGPSActive = false
             guard let city = locationPreferences.city(for: id) else { return }
+            cityName = city.name
+            timeZone = city.timeZone
             weatherModel.resetForLocationChange()
-            await loadSavedCity(city, force: true)
+            currentLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
+
+            let identity = LocationIdentity.savedCity(id: city.id)
+            if let cached = LocationSnapshotStore.loadSnapshot(for: identity),
+               SnapshotValidator.isFresh(snapshot: cached, for: identity, now: Date()) {
+                allItems = cached.items
+                todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: city.timeZone)
+                Task { await refreshWeather(force: false) }
+            } else {
+                todayItems = []
+                allItems = []
+            }
+
+            activeLoadTask = Task {
+                await loadSavedCity(city, force: false, gen: gen)
+            }
         }
     }
 
@@ -187,6 +231,7 @@ public final class AppModel: ObservableObject {
         // Fetch snapshot for the new city in background
         let cityLoc = CLLocation(latitude: latitude, longitude: longitude)
         let zone = TimeZone(identifier: timeZoneID) ?? .current
+        let identity = LocationIdentity.savedCity(id: newCity.id)
         if let items = try? await HebcalService.fetchDays(location: cityLoc, timeZone: zone, count: 8) {
             let snap = ZmanSnapshot(
                 cityName: newCity.name,
@@ -195,9 +240,10 @@ public final class AppModel: ObservableObject {
                 longitude: longitude,
                 updatedAt: Date(),
                 items: items,
-                locationSignature: "\(newCity.name)-\(timeZoneID)"
+                locationSignature: "\(newCity.name)-\(timeZoneID)",
+                sourceIdentity: identity
             )
-            LocationSnapshotStore.saveSnapshot(snap, for: "city_\(newCity.id)")
+            LocationSnapshotStore.saveSnapshot(snap, for: identity)
         }
 
         return newCity
@@ -205,7 +251,7 @@ public final class AppModel: ObservableObject {
 
     public func removeSavedCity(id: String) async {
         locationPreferences = LocationPreferencesStore.removeCity(id: id)
-        LocationSnapshotStore.removeSnapshot(for: "city_\(id)")
+        LocationSnapshotStore.removeSnapshot(for: .savedCity(id: id))
 
         // If the removed city was active, revert active choice to current default
         if case .savedCity(let activeId) = activeChoice, activeId == id {
@@ -216,9 +262,11 @@ public final class AppModel: ObservableObject {
         await rescheduleNotificationsForDefaultLocation()
     }
 
-    private func loadSavedCity(_ city: SavedCity, force: Bool) async {
-        let locationKey = "city_\(city.id)"
-        if !force, let cached = LocationSnapshotStore.loadSnapshot(for: locationKey), !cached.items.isEmpty {
+    private func loadSavedCity(_ city: SavedCity, force: Bool, gen: Int) async {
+        let identity = LocationIdentity.savedCity(id: city.id)
+        if !force, let cached = LocationSnapshotStore.loadSnapshot(for: identity),
+           SnapshotValidator.isFresh(snapshot: cached, for: identity, now: Date()) {
+            guard gen == loadGeneration else { return }
             cityName = city.name
             timeZone = city.timeZone
             allItems = cached.items
@@ -228,15 +276,48 @@ public final class AppModel: ObservableObject {
             return
         }
 
+        isLoading = true
+        defer {
+            if gen == loadGeneration {
+                isLoading = false
+            }
+        }
+
         let loc = CLLocation(latitude: city.latitude, longitude: city.longitude)
-        await load(
-            location: loc,
-            preferredCity: city.name,
-            preferredTimeZone: city.timeZone,
-            force: force,
-            isGPS: false,
-            sourceKey: locationKey
-        )
+        do {
+            let items = try await HebcalService.fetchDays(location: loc, timeZone: city.timeZone, count: 8)
+            guard gen == loadGeneration else { return }
+
+            cityName = city.name
+            timeZone = city.timeZone
+            allItems = items
+            todayItems = ZmanDayResolver.itemsForDay(from: items, date: Date(), timeZone: city.timeZone)
+            currentLocation = loc
+            errorMessage = nil
+
+            let snapshot = ZmanSnapshot(
+                cityName: city.name,
+                timeZoneID: city.timeZone.identifier,
+                latitude: city.latitude,
+                longitude: city.longitude,
+                updatedAt: Date(),
+                items: items,
+                locationSignature: "\(city.name)-\(city.timeZone.identifier)",
+                sourceIdentity: identity
+            )
+            LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
+            WidgetCenter.shared.reloadAllTimelines()
+
+            // If this is default location, reschedule notifications
+            if case .savedCity(let defaultId) = locationPreferences.defaultChoice, defaultId == city.id {
+                await NotificationScheduler.rescheduleIfAuthorized(settings: settings, items: allItems, timeZone: city.timeZone)
+            }
+
+            await refreshWeather(force: force)
+        } catch {
+            guard gen == loadGeneration else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 
     public func refreshWeather(force: Bool = false) async {
@@ -257,6 +338,7 @@ public final class AppModel: ObservableObject {
         )
     }
 
+    /// Selects a location from search. Only sets activeChoice, does NOT alter defaultChoice.
     public func selectFixedLocation(_ resolved: ResolvedLocation) async {
         let city = await addSavedCity(
             name: resolved.displayName,
@@ -264,7 +346,6 @@ public final class AppModel: ObservableObject {
             longitude: resolved.longitude,
             timeZoneID: resolved.timeZoneID
         )
-        await setDefaultLocationChoice(.savedCity(id: city.id))
         await selectActiveChoice(.savedCity(id: city.id))
     }
 
@@ -291,13 +372,36 @@ public final class AppModel: ObservableObject {
         }
 
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if gen == loadGeneration {
+                isLoading = false
+            }
+        }
 
-        let description = await locationService.describe(location)
-        guard gen == loadGeneration else { return }
+        var resolvedLocality: String? = preferredCity
+        var resolvedZone: TimeZone? = preferredTimeZone
 
-        let city = preferredCity ?? description.city
-        let zone = preferredTimeZone ?? description.timeZone
+        if isGPS {
+            let description = await locationService.describe(location)
+            guard gen == loadGeneration else { return }
+            if let city = description.city, !city.isEmpty {
+                resolvedLocality = city
+                let localityInfo = VerifiedLocality(
+                    name: city,
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    timeZoneID: (description.timeZone ?? timeZone).identifier,
+                    localeIdentifier: Locale.autoupdatingCurrent.identifier
+                )
+                VerifiedLocalityStore.save(localityInfo)
+            } else {
+                resolvedLocality = VerifiedLocalityStore.load(for: location.coordinate)?.name
+            }
+            resolvedZone = description.timeZone ?? preferredTimeZone ?? timeZone
+        }
+
+        let city = resolvedLocality ?? ""
+        let zone = resolvedZone ?? timeZone
 
         do {
             let items = try await HebcalService.fetchDays(location: location, timeZone: zone, count: 8)
@@ -308,10 +412,11 @@ public final class AppModel: ObservableObject {
             allItems = items
             currentLocation = location
             isGPSActive = isGPS
+            errorMessage = nil
 
             todayItems = ZmanDayResolver.itemsForDay(from: items, date: Date(), timeZone: zone)
 
-            let storageKey = sourceKey ?? (isGPS ? "current" : "default")
+            let identity: LocationIdentity = isGPS ? .gps : (sourceKey.flatMap { $0.hasPrefix("city_") ? .savedCity(id: String($0.dropFirst("city_".count))) : nil } ?? .gps)
             let snapshot = ZmanSnapshot(
                 cityName: city,
                 timeZoneID: zone.identifier,
@@ -319,9 +424,10 @@ public final class AppModel: ObservableObject {
                 longitude: location.coordinate.longitude,
                 updatedAt: Date(),
                 items: items,
-                locationSignature: "\(city)-\(zone.identifier)"
+                locationSignature: isGPS ? "current" : "\(city)-\(zone.identifier)",
+                sourceIdentity: identity
             )
-            LocationSnapshotStore.saveSnapshot(snapshot, for: storageKey)
+            LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
             WidgetCenter.shared.reloadAllTimelines()
 
             // If the loaded location is the persistent default location, reschedule notifications
@@ -330,7 +436,7 @@ public final class AppModel: ObservableObject {
             case .current:
                 isDefaultLocation = isGPS
             case .savedCity(let id):
-                isDefaultLocation = (sourceKey == "city_\(id)")
+                isDefaultLocation = (identity == .savedCity(id: id))
             }
             if isDefaultLocation {
                 await NotificationScheduler.rescheduleIfAuthorized(settings: settings, items: allItems, timeZone: zone)
@@ -365,10 +471,11 @@ public final class AppModel: ObservableObject {
                 Task {
                     await load(
                         location: currentLocation,
-                        preferredCity: cityName,
+                        preferredCity: cityName.isEmpty ? nil : cityName,
                         preferredTimeZone: timeZone,
                         force: true,
-                        isGPS: isGPSActive
+                        isGPS: isGPSActive,
+                        sourceKey: activeChoice.storageKey
                     )
                 }
             } else {
@@ -396,15 +503,16 @@ public final class AppModel: ObservableObject {
         guard settings.rules.contains(where: \.isEnabled) || settings.specialDaysMasterEnabled else { return }
         guard (try? await NotificationScheduler.requestAuthorization()) == true else { return }
 
-        let defaultTargetKey = locationPreferences.defaultChoice.storageKey
-        if let defaultSnapshot = LocationSnapshotStore.loadSnapshot(for: defaultTargetKey) ?? AppGroupStore.loadSnapshot(),
-           !defaultSnapshot.items.isEmpty {
+        let defaultIdentity = locationPreferences.defaultChoice.identity
+        if let defaultSnapshot = LocationSnapshotStore.loadSnapshot(for: defaultIdentity),
+           !defaultSnapshot.items.isEmpty,
+           let defaultZone = defaultSnapshot.validTimeZone {
             await NotificationScheduler.schedule(
                 settings: settings,
                 items: defaultSnapshot.items,
-                timeZone: defaultSnapshot.timeZone
+                timeZone: defaultZone
             )
-        } else if case .current = locationPreferences.defaultChoice, !allItems.isEmpty {
+        } else if case .current = locationPreferences.defaultChoice, isGPSActive, !allItems.isEmpty {
             await NotificationScheduler.schedule(
                 settings: settings,
                 items: allItems,

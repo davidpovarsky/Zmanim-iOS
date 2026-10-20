@@ -101,9 +101,34 @@
 "widget.a11y.next_page" = "Forward to next five zmanim";
 
 "weather.source_attribution" = "Weather data: MET Norway (CC BY 4.0)";
-"weather.header_a11y_format" = "Weather forecast for %1$@: %2$@, %3$@";
+"weather.header_a11y_format" = "Weather forecast: %1$@, %2$@";
 "weather.header_a11y_hint" = "Double tap to open detailed forecast card";
 
 "error.invalid_url" = "Unable to construct Hebcal request.";
 "error.invalid_response_format" = "Hebcal returned error %d.";
 "error.empty_data" = "No data received from Hebcal.";
+
+"widget.shared_store_unavailable" = "Shared settings unavailable — open app to refresh";
+"widget.city_not_found" = "City not found — open app to refresh";
+"widget.invalid_configuration" = "Invalid widget configuration — edit widget";
+"widget.location_not_found" = "Location not found";
+
+"location.store_unavailable" = "Shared settings store is unavailable.";
+"location.save_failed" = "Failed to save location settings.";
+
+"search.no_results" = "No search results found.";
+"search.invalid_coords" = "Invalid location coordinates.";
+"search.timezone_not_found" = "Unable to determine location time zone.";
+"search.failed_format" = "Location selection failed: %@";
+
+"notification.shabbat_candle_body" = "Candle lighting today at %@";
+"notification.shabbat_exit_body" = "Shabbat ends today at %@";
+"notification.shabbat_exit" = "Shabbat Ends";
+"notification.holiday_candle_body" = "Holiday begins today at %@";
+
+"weather.error.invalid_coordinates" = "Invalid location coordinates.";
+"weather.error.invalid_url" = "Unable to construct weather request URL.";
+"weather.error.server_error_format" = "Weather service returned error %d.";
+"weather.error.empty_data" = "No weather forecast data received.";
+"weather.error.decoding_failed_format" = "Weather decoding failed: %@";
+

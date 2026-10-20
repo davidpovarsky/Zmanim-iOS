@@ -12,7 +12,7 @@ public final class WeatherSceneModel: ObservableObject {
 
     @Published public var isAvailable: Bool = false
     @Published public var condition: WeatherCondition? = nil
-    @Published public var cloudCover: Double = 0.0
+    @Published public var cloudCover: Double? = nil
     @Published public var currentSnapshot: WeatherSnapshot? = nil
     @Published public var weatherDisplay: WeatherDisplay? = nil
     @Published public var lastUpdated: Date? = nil
@@ -20,6 +20,10 @@ public final class WeatherSceneModel: ObservableObject {
     #if DEBUG
     @Published public var previewOverride: WeatherScenePreview? = nil
     #endif
+
+    public var effectiveCloudCover: Double {
+        cloudCover ?? 0.0
+    }
 
     private var currentCoordinate: CLLocationCoordinate2D?
     private var currentCityName: String = ""
@@ -29,7 +33,7 @@ public final class WeatherSceneModel: ObservableObject {
         // Starts strictly unavailable with no fabricated weather data
         self.isAvailable = false
         self.condition = nil
-        self.cloudCover = 0.0
+        self.cloudCover = nil
         self.currentSnapshot = nil
         self.weatherDisplay = nil
     }
@@ -57,7 +61,11 @@ public final class WeatherSceneModel: ObservableObject {
         #endif
 
         isFetching = true
-        defer { isFetching = false }
+        defer {
+            if generation == self.updateGeneration {
+                isFetching = false
+            }
+        }
 
         do {
             let snapshot = try await METNorwayWeatherClient.shared.fetchForecast(
@@ -107,11 +115,11 @@ public final class WeatherSceneModel: ObservableObject {
             )
 
             // Strictly authentic cloud fraction; never fabricate estimated measurements
-            let clouds: Double
+            let clouds: Double?
             if let cloudFraction = currentHour?.cloudAreaFractionPercent {
                 clouds = cloudFraction / 100.0
             } else {
-                clouds = 0.0
+                clouds = nil
             }
 
             self.currentSnapshot = snapshot
@@ -142,7 +150,7 @@ public final class WeatherSceneModel: ObservableObject {
                 self.currentSnapshot = nil
                 self.weatherDisplay = nil
                 self.condition = nil
-                self.cloudCover = 0.0
+                self.cloudCover = nil
                 self.isAvailable = false
             }
         }
@@ -154,11 +162,8 @@ public final class WeatherSceneModel: ObservableObject {
         self.currentSnapshot = nil
         self.weatherDisplay = nil
         self.condition = nil
-        self.cloudCover = 0.0
+        self.cloudCover = nil
         self.isAvailable = false
-        Task {
-            await WeatherCache.shared.clear()
-        }
     }
 
     #if DEBUG

@@ -28,13 +28,13 @@ public enum CitySearchError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .noResults:
-            return NSLocalizedString("search.no_results", value: "לא נמצאו תוצאות לחיפוש.", comment: "")
+            return NSLocalizedString("search.no_results", comment: "")
         case .invalidCoordinates:
-            return NSLocalizedString("search.invalid_coords", value: "קואורדינטות המיקום אינן תקינות.", comment: "")
+            return NSLocalizedString("search.invalid_coords", comment: "")
         case .timeZoneNotFound:
-            return NSLocalizedString("search.timezone_not_found", value: "לא ניתן לקבוע את אזור הזמן של המיקום.", comment: "")
+            return NSLocalizedString("search.timezone_not_found", comment: "")
         case .resolutionFailed(let reason):
-            return String(format: NSLocalizedString("search.failed_format", value: "בחירת המיקום נכשלה: %@", comment: ""), reason)
+            return String(format: NSLocalizedString("search.failed_format", comment: ""), reason)
         }
     }
 }
@@ -112,7 +112,7 @@ public final class CitySearchService: NSObject, ObservableObject, MKLocalSearchC
             self.rawCompletions = completionMap
             self.suggestions = results
             self.isSearching = false
-            self.errorMessage = results.isEmpty ? NSLocalizedString("search.no_results", value: "לא נמצאו תוצאות.", comment: "") : nil
+            self.errorMessage = results.isEmpty ? NSLocalizedString("search.no_results", comment: "") : nil
         }
     }
 

@@ -137,7 +137,7 @@ struct LocationSelectionCard: View {
             }
         }
         .confirmationDialog(
-            String(format: NSLocalizedString("location.confirm_remove_city", value: "האם להסיר את %@ מרשימת הערים השמורות?", comment: ""), cityToDelete?.name ?? ""),
+            String(format: NSLocalizedString("location.confirm_remove_city", comment: ""), cityToDelete?.name ?? ""),
             isPresented: $isConfirmingDelete,
             titleVisibility: .visible
         ) {

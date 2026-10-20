@@ -62,7 +62,7 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         eyebrowLabel.font = .preferredFont(forTextStyle: .caption1)
         eyebrowLabel.textColor = .secondaryLabel
         eyebrowLabel.textAlignment = .natural
-        eyebrowLabel.text = NSLocalizedString("notification.time_reminder", value: "תזכורת זמן", comment: "")
+        eyebrowLabel.text = NSLocalizedString("notification.time_reminder", comment: "")
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
@@ -181,7 +181,7 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         #endif
 
         let title = content.userInfo["zmanTitle"] as? String ?? content.title
-        titleLabel.text = title.isEmpty ? NSLocalizedString("notification.time_reminder", value: "תזכורת זמן", comment: "") : title
+        titleLabel.text = title.isEmpty ? NSLocalizedString("notification.time_reminder", comment: "") : title
 
         let iconName = content.userInfo["zmanIcon"] as? String ?? "sun.max.fill"
         iconView.image = UIImage(systemName: iconName) ?? UIImage(systemName: "sun.max.fill")
@@ -228,11 +228,11 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         guard let targetDate else { return }
         let minutes = Int(ceil(targetDate.timeIntervalSinceNow / 60))
         if minutes > 0 {
-            countdownLabel.text = String(format: NSLocalizedString("notification.in_minutes_format", value: "בעוד %d דקות", comment: ""), minutes)
+            countdownLabel.text = String(format: NSLocalizedString("notification.in_minutes_format", comment: ""), minutes)
         } else if minutes == 0 {
-            countdownLabel.text = NSLocalizedString("notification.time_arrived", value: "הזמן הגיע", comment: "")
+            countdownLabel.text = NSLocalizedString("notification.time_arrived", comment: "")
         } else {
-            countdownLabel.text = String(format: NSLocalizedString("notification.minutes_ago_format", value: "לפני %d דקות", comment: ""), abs(minutes))
+            countdownLabel.text = String(format: NSLocalizedString("notification.minutes_ago_format", comment: ""), abs(minutes))
         }
     }
 

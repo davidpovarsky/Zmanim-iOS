@@ -66,8 +66,8 @@ public struct HomeView: View {
             timeZone: model.timeZone,
             sunrise: sunrise,
             sunset: sunset,
-            condition: model.weatherModel.condition,
-            cloudCover: model.weatherModel.cloudCover,
+            condition: model.weatherModel.isAvailable ? model.weatherModel.condition : nil,
+            cloudCover: model.weatherModel.effectiveCloudCover,
             colorScheme: colorScheme
         )
 
@@ -136,8 +136,8 @@ public struct HomeView: View {
             timeZone: model.timeZone,
             sunrise: sunrise,
             sunset: sunset,
-            condition: model.weatherModel.condition,
-            cloudCover: model.weatherModel.cloudCover
+            condition: model.weatherModel.isAvailable ? model.weatherModel.condition : nil,
+            cloudCover: model.weatherModel.effectiveCloudCover
         )
     }
 

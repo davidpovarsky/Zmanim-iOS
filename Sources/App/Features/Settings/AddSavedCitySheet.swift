@@ -22,7 +22,7 @@ public struct AddSavedCitySheet: View {
                 if isResolving {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text(NSLocalizedString("settings.resolving_location", value: "מאמת מיקום…", comment: ""))
+                        Text(NSLocalizedString("settings.resolving_location", comment: ""))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

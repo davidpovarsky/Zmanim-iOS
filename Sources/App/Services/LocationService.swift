@@ -21,7 +21,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     func start() {
         guard CLLocationManager.locationServicesEnabled() else {
-            errorMessage = NSLocalizedString("location.services_disabled", value: "שירותי המיקום כבויים.", comment: "")
+            errorMessage = NSLocalizedString("location.services_disabled", comment: "")
             return
         }
 
@@ -31,7 +31,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         case .authorizedAlways, .authorizedWhenInUse:
             manager.requestLocation()
         case .denied, .restricted:
-            errorMessage = NSLocalizedString("location.permission_required", value: "יש לאפשר גישה למיקום כדי לקבל זמני יום מדויקים.", comment: "")
+            errorMessage = NSLocalizedString("location.permission_required", comment: "")
         default:
             break
         }
@@ -61,21 +61,22 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
-            self.errorMessage = NSLocalizedString("location.geocode_failed", value: "לא הצלחנו לקבל את המיקום הנוכחי.", comment: "")
+            self.errorMessage = NSLocalizedString("location.geocode_failed", comment: "")
         }
     }
 
-    func describe(_ location: CLLocation) async -> (city: String, timeZone: TimeZone) {
-        let fallbackName = NSLocalizedString("location.current", value: "המיקום הנוכחי", comment: "")
+    /// Performs reverse geocoding to resolve genuine locality name and timezone.
+    /// Strictly returns nil if unverified; never returns fabricated or generic status strings as city name.
+    func describe(_ location: CLLocation) async -> (city: String?, timeZone: TimeZone?) {
         do {
             let placemarks = try await geocoder.reverseGeocodeLocation(location, preferredLocale: Locale.autoupdatingCurrent)
             guard let place = placemarks.first else {
-                return (fallbackName, .current)
+                return (nil, nil)
             }
-            let cityName = place.locality ?? place.subLocality ?? place.administrativeArea ?? fallbackName
-            return (cityName, place.timeZone ?? .current)
+            let cityName = place.locality ?? place.subLocality ?? place.administrativeArea
+            return (cityName, place.timeZone)
         } catch {
-            return (fallbackName, .current)
+            return (nil, nil)
         }
     }
 
@@ -85,6 +86,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             throw CLError(.geocodeFoundNoResult)
         }
         let resolvedCity = place.locality ?? place.name ?? city
-        return (location, resolvedCity, place.timeZone ?? .current)
+        guard let tz = place.timeZone else {
+            throw CLError(.geocodeFoundNoResult)
+        }
+        return (location, resolvedCity, tz)
     }
 }

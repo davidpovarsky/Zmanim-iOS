@@ -49,12 +49,12 @@ public enum SpecialDayNotificationPlanner {
                 if weekday == 6 {
                     let formattedTime = timeFormatter.string(from: item.date)
                     let body = String(
-                        format: NSLocalizedString("notification.shabbat_candle_body", value: "כניסת שבת בשעה %@", comment: ""),
+                        format: NSLocalizedString("notification.shabbat_candle_body", comment: ""),
                         formattedTime
                     )
                     results.append(ScheduledSpecialNotification(
                         id: "zmanim.special.shabbat.candle.\(Int(item.date.timeIntervalSince1970))",
-                        title: NSLocalizedString("settings.shabbat", value: "כניסת שבת", comment: ""),
+                        title: NSLocalizedString("settings.shabbat", comment: ""),
                         body: body,
                         fireDate: item.date,
                         icon: "flame.fill"
@@ -73,12 +73,12 @@ public enum SpecialDayNotificationPlanner {
             for item in havdalahCandidates {
                 let formattedTime = timeFormatter.string(from: item.date)
                 let body = String(
-                    format: NSLocalizedString("notification.shabbat_exit_body", value: "צאת שבת בשעה %@", comment: ""),
+                    format: NSLocalizedString("notification.shabbat_exit_body", comment: ""),
                     formattedTime
                 )
                 results.append(ScheduledSpecialNotification(
                     id: "zmanim.special.shabbat.havdalah.\(Int(item.date.timeIntervalSince1970))",
-                    title: NSLocalizedString("notification.shabbat_exit", value: "מוצאי שבת", comment: ""),
+                    title: NSLocalizedString("notification.shabbat_exit", comment: ""),
                     body: body,
                     fireDate: item.date,
                     icon: "sparkles"
@@ -97,12 +97,12 @@ public enum SpecialDayNotificationPlanner {
             for item in holidayCandleItems {
                 let formattedTime = timeFormatter.string(from: item.date)
                 let body = String(
-                    format: NSLocalizedString("notification.holiday_candle_body", value: "כניסת החג בשעה %@", comment: ""),
+                    format: NSLocalizedString("notification.holiday_candle_body", comment: ""),
                     formattedTime
                 )
                 results.append(ScheduledSpecialNotification(
                     id: "zmanim.special.holiday.candle.\(Int(item.date.timeIntervalSince1970))",
-                    title: NSLocalizedString("settings.holidays_fasts", value: "כניסת החג", comment: ""),
+                    title: NSLocalizedString("settings.holidays_fasts", comment: ""),
                     body: body,
                     fireDate: item.date,
                     icon: "flame.fill"

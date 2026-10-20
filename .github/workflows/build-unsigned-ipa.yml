@@ -130,6 +130,11 @@ jobs:
           device_id: ${{ secrets.NOTIFY_DEVICE_ID }}
           token: ${{ secrets.NOTIFY_DEVICE_TOKEN }}
           github_token: ${{ github.token }}
+      - name: Verify localization completeness
+        run: |
+          chmod +x scripts/verify-localization-completeness.sh
+          bash scripts/verify-localization-completeness.sh
+
       - name: Validate simulator product structure and Info.plists
         run: |
           set -euo pipefail
@@ -295,7 +300,8 @@ jobs:
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qry Zmanim-unsigned.ipa Payload
-          chmod +x scripts/verify-ipa-extensions.sh scripts/verify-ipa-localizations.sh scripts/verify-ipa-windowing.sh
+          chmod +x scripts/verify-localization-completeness.sh scripts/verify-ipa-extensions.sh scripts/verify-ipa-localizations.sh scripts/verify-ipa-windowing.sh
+          bash scripts/verify-localization-completeness.sh
           bash scripts/verify-ipa-windowing.sh Zmanim-unsigned.ipa
           bash scripts/verify-ipa-extensions.sh Zmanim-unsigned.ipa
           bash scripts/verify-ipa-localizations.sh Zmanim-unsigned.ipa
