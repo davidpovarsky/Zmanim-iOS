@@ -105,9 +105,9 @@ final class SolarArcGeometryTests: XCTestCase {
         // Exactly sunset -> 1.0
         XCTAssertEqual(SolarArcGeometry.progress(now: sunset, sunrise: sunrise, sunset: sunset), 1.0)
 
-        // After sunset -> clamp 1.0
+        // After sunset -> night state: daylight has ended, progress returns 0.0 (no fake 1.0)
         let after = sunset.addingTimeInterval(3600)
-        XCTAssertEqual(SolarArcGeometry.progress(now: after, sunrise: sunrise, sunset: sunset), 1.0)
+        XCTAssertEqual(SolarArcGeometry.progress(now: after, sunrise: sunrise, sunset: sunset), 0.0)
 
         // Missing data or invalid order
         XCTAssertEqual(SolarArcGeometry.progress(now: midday, sunrise: nil, sunset: sunset), 0.0)
