@@ -286,10 +286,17 @@ final class AppModel: ObservableObject {
     }
 
     public func sendTestNotification() async {
-        let bgTask = UIApplication.shared.beginBackgroundTask(withName: "sendTestNotification") { }
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask(withName: "sendTestNotification") {
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+        }
         defer {
             if bgTask != .invalid {
                 UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
             }
         }
         if (try? await NotificationScheduler.requestAuthorization()) == true {

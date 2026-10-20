@@ -184,22 +184,34 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
 
         switch actionID {
         case NotificationSchedulerConstants.snoozeActionID:
-            let bgTask = UIApplication.shared.beginBackgroundTask(withName: "scheduleSnooze") { }
-            let request = ZmanimSnoozeRequest.make(
-                from: response.notification.request.content,
-                originalIdentifier: originalID
-            )
-            center.add(request) { error in
-                #if DEBUG
-                if let error {
-                    Self.logger.error("NotificationCoordinator failed to schedule snooze: \(error.localizedDescription, privacy: .public)")
-                } else {
-                    Self.logger.notice("NotificationCoordinator scheduled snooze: \(request.identifier, privacy: .public)")
+            DispatchQueue.main.async {
+                var bgTask: UIBackgroundTaskIdentifier = .invalid
+                bgTask = UIApplication.shared.beginBackgroundTask(withName: "scheduleSnooze") {
+                    if bgTask != .invalid {
+                        UIApplication.shared.endBackgroundTask(bgTask)
+                        bgTask = .invalid
+                    }
                 }
-                #endif
-                completionHandler()
-                if bgTask != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTask)
+
+                let request = ZmanimSnoozeRequest.make(
+                    from: response.notification.request.content,
+                    originalIdentifier: originalID
+                )
+                center.add(request) { error in
+                    #if DEBUG
+                    if let error {
+                        Self.logger.error("NotificationCoordinator failed to schedule snooze: \(error.localizedDescription, privacy: .public)")
+                    } else {
+                        Self.logger.notice("NotificationCoordinator scheduled snooze: \(request.identifier, privacy: .public)")
+                    }
+                    #endif
+                    completionHandler()
+                    DispatchQueue.main.async {
+                        if bgTask != .invalid {
+                            UIApplication.shared.endBackgroundTask(bgTask)
+                            bgTask = .invalid
+                        }
+                    }
                 }
             }
         case NotificationSchedulerConstants.openActionID:
