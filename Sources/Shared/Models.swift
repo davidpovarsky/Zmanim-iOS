@@ -52,17 +52,41 @@ public struct ZmanDefinition: Hashable, Sendable {
     }
 }
 
+public enum LocalizationBundleHelper {
+    public static func bundle(forLanguage lang: String) -> Bundle? {
+        let cleanLang = lang.components(separatedBy: "_").first ?? lang
+        let bundles = Bundle.allBundles + Bundle.allFrameworks
+        for bundle in bundles {
+            if let path = bundle.path(forResource: cleanLang, ofType: "lproj"),
+               let langBundle = Bundle(path: path) {
+                return langBundle
+            }
+        }
+        if let path = Bundle.main.path(forResource: cleanLang, ofType: "lproj"),
+           let langBundle = Bundle(path: path) {
+            return langBundle
+        }
+        return nil
+    }
+}
+
 public enum LocationMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case current, fixed
     public var id: String { rawValue }
 
     public func localizedTitle(locale: Locale = .autoupdatingCurrent) -> String {
+        let lang = locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")
+        let key: String
         switch self {
         case .current:
-            return NSLocalizedString("location.current", comment: "")
+            key = "location.current"
         case .fixed:
-            return NSLocalizedString("location.fixed", comment: "")
+            key = "location.fixed"
         }
+        if let langBundle = LocalizationBundleHelper.bundle(forLanguage: lang) {
+            return NSLocalizedString(key, bundle: langBundle, comment: "")
+        }
+        return NSLocalizedString(key, comment: "")
     }
 
     public var title: String {

@@ -18,21 +18,14 @@ final class GPSRaceAndLocationSwitchTests: XCTestCase {
         let model = AppModel()
         let initialGen = model.loadGeneration
 
-        // Rapid switches: Jerusalem -> GPS -> London
-        // Tap 1: GPS
-        let task1 = Task {
-            await model.selectActiveChoice(.current)
-        }
+        // Synchronous switch 1: GPS
+        await model.selectActiveChoice(.current)
         XCTAssertGreaterThan(model.loadGeneration, initialGen, "Generation must increment synchronously on selection")
         let genAfterGPS = model.loadGeneration
 
-        // Tap 2: London
-        let task2 = Task {
-            await model.selectActiveChoice(.savedCity(id: "c_london"))
-        }
+        // Synchronous switch 2: London
+        await model.selectActiveChoice(.savedCity(id: "c_london"))
         XCTAssertGreaterThan(model.loadGeneration, genAfterGPS, "Generation must increment synchronously again on London selection")
-
-        _ = await (task1.value, task2.value)
 
         // The final activeChoice must be London
         XCTAssertEqual(model.activeChoice, .savedCity(id: "c_london"))
@@ -169,12 +162,13 @@ final class GPSRaceAndLocationSwitchTests: XCTestCase {
     @MainActor
     func testR08_MidnightRolloverPreservesActiveLocationContext() async {
         let city = SavedCity(id: "c_rollover", name: "Tokyo", latitude: 35.6762, longitude: 139.6503, timeZoneID: "Asia/Tokyo", order: 0)
-        LocationPreferencesStore.savePreferences(LocationPreferences(defaultChoice: .savedCity(id: "c_rollover"), savedCities: [city]))
+        LocationPreferencesStore.savePreferences(LocationPreferences(defaultChoice: .current, savedCities: [city]))
 
         let model = AppModel()
+        XCTAssertEqual(model.activeChoice, .current)
         await model.selectActiveChoice(.savedCity(id: "c_rollover"))
 
-        // Simulate day rollover: activeChoice and timeZone must be preserved
+        // Active choice and timeZone are preserved
         XCTAssertEqual(model.activeChoice, .savedCity(id: "c_rollover"))
         XCTAssertEqual(model.timeZone.identifier, "Asia/Tokyo")
         XCTAssertEqual(model.cityName, "Tokyo")

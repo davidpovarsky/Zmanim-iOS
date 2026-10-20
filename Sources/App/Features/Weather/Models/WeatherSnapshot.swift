@@ -12,10 +12,8 @@ public struct WeatherSnapshot: Sendable, Equatable, Codable {
     }
 
     public func attribution(language: String? = nil) -> String {
-        if language == "en" {
-            return NSLocalizedString("weather.source_attribution", bundle: Bundle.main, comment: "")
-        } else if language == "he" {
-            return NSLocalizedString("weather.source_attribution", bundle: Bundle.main, comment: "")
+        if let language, let langBundle = LocalizationBundleHelper.bundle(forLanguage: language) {
+            return NSLocalizedString("weather.source_attribution", bundle: langBundle, comment: "")
         }
         return Self.attribution
     }
