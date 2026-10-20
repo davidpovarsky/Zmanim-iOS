@@ -45,7 +45,7 @@ public struct ZmanimSkyBackdrop: View {
                 let isLandscape = proxy.size.width > proxy.size.height
                 let backdropHeight: CGFloat = isLandscape
                     ? max(340, proxy.size.height * 0.70)
-                    : min(max(proxy.safeAreaInsets.top + 330, 380), 460)
+                    : max(380, min(proxy.safeAreaInsets.top + 460, proxy.size.height * 0.58))
 
                 SkyBackdrop(
                     date: date,

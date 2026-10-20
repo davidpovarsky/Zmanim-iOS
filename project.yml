@@ -42,6 +42,15 @@ targets:
         UILaunchScreen: {}
         NSLocationWhenInUseUsageDescription: "המיקום משמש לחישוב זמני היום המדויקים באזור שלך."
         NSSupportsLiveActivities: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     dependencies:
       - package: SwiftUISky
         product: SwiftUISky
@@ -85,6 +94,7 @@ targets:
       - Sources/NotificationContent
       - Sources/Shared/SnoozeRequest.swift
       - Sources/Shared/SolarArcGeometry.swift
+      - Sources/Shared/SolarPhase.swift
       - path: Resources
         buildPhase: resources
     resources:

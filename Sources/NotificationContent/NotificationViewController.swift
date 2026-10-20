@@ -149,8 +149,9 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         let margin: CGFloat = 12
         let base = bounds.height - 4
         let arcHeight = bounds.height - 10
-        let p0 = CGPoint(x: margin, y: base)
-        let p2 = CGPoint(x: bounds.width - margin, y: base)
+        let isRTL = view.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        let p0 = isRTL ? CGPoint(x: bounds.width - margin, y: base) : CGPoint(x: margin, y: base)
+        let p2 = isRTL ? CGPoint(x: margin, y: base) : CGPoint(x: bounds.width - margin, y: base)
         let p1 = CGPoint(x: bounds.width / 2, y: base - 2 * arcHeight)
 
         let path = UIBezierPath()
@@ -159,11 +160,16 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         arcLayer.path = path.cgPath
         arcLayer.frame = bounds
 
-        let t = CGFloat(currentProgress)
-        let u = 1 - t
-        let sunX = u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x
-        let sunY = u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y
-        sunView.center = CGPoint(x: sunX, y: sunY)
+        if currentProgress >= 0 {
+            sunView.isHidden = false
+            let t = CGFloat(currentProgress)
+            let u = 1 - t
+            let sunX = u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x
+            let sunY = u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y
+            sunView.center = CGPoint(x: sunX, y: sunY)
+        } else {
+            sunView.isHidden = true
+        }
     }
 
     public func didReceive(_ notification: UNNotification) {
@@ -199,14 +205,20 @@ public final class NotificationViewController: UIViewController, UNNotificationC
 
         if let progressVal = content.userInfo["zmanProgress"] as? Double {
             currentProgress = max(0, min(1, progressVal))
-        } else if title.contains("שקיעה") || title.localizedCaseInsensitiveContains("sunset") {
-            currentProgress = 0.90
-        } else if title.contains("זריחה") || title.localizedCaseInsensitiveContains("sunrise") {
-            currentProgress = 0.10
-        } else if title.contains("חצות") || title.localizedCaseInsensitiveContains("chatzot") {
-            currentProgress = 0.50
+        } else if let sunriseTime = content.userInfo["sunriseTime"] as? Double,
+                  let sunsetTime = content.userInfo["sunsetTime"] as? Double,
+                  let target = targetDate,
+                  sunriseTime > 0, sunsetTime > sunriseTime {
+            let rise = Date(timeIntervalSince1970: sunriseTime)
+            let set = Date(timeIntervalSince1970: sunsetTime)
+            let phase = SolarPhase.resolve(now: target, sunrise: rise, sunset: set)
+            if phase.isDaylight {
+                currentProgress = phase.progress
+            } else {
+                currentProgress = -1
+            }
         } else {
-            currentProgress = 0.75
+            currentProgress = -1
         }
 
         view.setNeedsLayout()

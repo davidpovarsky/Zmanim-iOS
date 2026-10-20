@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
 
     let locationService = LocationService()
     private var currentLocation: CLLocation?
+    private var loadGeneration: Int = 0
 
     init() {
         if let snapshot = AppGroupStore.loadSnapshot(), !snapshot.items.isEmpty {
@@ -147,12 +148,30 @@ final class AppModel: ObservableObject {
         )
     }
 
+    public func selectFixedLocation(_ resolved: ResolvedLocation) async {
+        settings.locationMode = .fixed
+        settings.fixedCity = resolved.displayName
+        settings.resolvedFixedLocation = resolved
+        AppGroupStore.saveSettings(settings)
+        weatherModel.resetForLocationChange()
+        let location = CLLocation(latitude: resolved.latitude, longitude: resolved.longitude)
+        await load(
+            location: location,
+            preferredCity: resolved.displayName,
+            preferredTimeZone: resolved.timeZone,
+            force: true
+        )
+    }
+
     public func load(
         location: CLLocation,
         preferredCity: String? = nil,
         preferredTimeZone: TimeZone? = nil,
         force: Bool = false
     ) async {
+        loadGeneration += 1
+        let gen = loadGeneration
+
         if !force, let currentLocation, currentLocation.distance(from: location) < 100 {
             var cal = Calendar(identifier: .gregorian)
             let checkZone = preferredTimeZone ?? timeZone
@@ -168,11 +187,15 @@ final class AppModel: ObservableObject {
         defer { isLoading = false }
 
         let description = await locationService.describe(location)
+        guard gen == loadGeneration else { return }
+
         let city = preferredCity ?? description.city
         let zone = preferredTimeZone ?? description.timeZone
 
         do {
             let items = try await HebcalService.fetchDays(location: location, timeZone: zone, count: 8)
+            guard gen == loadGeneration else { return }
+
             cityName = city
             timeZone = zone
             allItems = items
@@ -187,7 +210,7 @@ final class AppModel: ObservableObject {
                 longitude: location.coordinate.longitude,
                 updatedAt: Date(),
                 items: items,
-                locationSignature: city
+                locationSignature: "\(city)-\(zone.identifier)"
             ))
             WidgetCenter.shared.reloadAllTimelines()
             await NotificationScheduler.rescheduleIfAuthorized(settings: settings, items: allItems, timeZone: zone)
@@ -195,6 +218,7 @@ final class AppModel: ObservableObject {
             // Update weather asynchronously with genuine MET Norway data
             await refreshWeather(force: force)
         } catch {
+            guard gen == loadGeneration else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -247,13 +271,14 @@ final class AppModel: ObservableObject {
         if settings.locationMode == .fixed {
             weatherModel.resetForLocationChange()
             await refreshFixedCity()
-        } else if let currentLocation {
-            await load(location: currentLocation, force: true)
         } else {
+            // Atomic switch back to GPS: clear old fixed location state and request fresh GPS
+            currentLocation = nil
+            cityName = NSLocalizedString("location.updating", value: "מעדכן מיקום…", comment: "")
             locationService.start()
         }
 
-        if settings.rules.contains(where: \.isEnabled) {
+        if settings.rules.contains(where: \.isEnabled) || settings.specialDaysMasterEnabled {
             if (try? await NotificationScheduler.requestAuthorization()) == true {
                 await NotificationScheduler.schedule(settings: settings, items: allItems, timeZone: timeZone)
             }

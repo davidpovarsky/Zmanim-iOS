@@ -34,13 +34,17 @@ public actor METNorwayWeatherClient {
     private let cache: WeatherCache
 
     public init(
-        session: URLSession = .shared,
+        session: URLSession? = nil,
         cache: WeatherCache = .shared
     ) {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 10
-        config.timeoutIntervalForResource = 15
-        self.session = URLSession(configuration: config)
+        if let session {
+            self.session = session
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 10
+            config.timeoutIntervalForResource = 15
+            self.session = URLSession(configuration: config)
+        }
         self.cache = cache
     }
 

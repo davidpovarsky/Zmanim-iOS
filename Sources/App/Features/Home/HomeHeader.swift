@@ -29,30 +29,61 @@ public struct HomeHeader: View {
     }
 
     public var body: some View {
-        HStack {
-            // In RTL locale (Hebrew), leading is on the right
-            VStack(alignment: .leading, spacing: 3) {
-                Text(weekdayString(from: date))
-                    .font(.subheadline)
-                    .foregroundStyle(textColor.opacity(0.85))
-                Text(hebrewDateString(from: date))
-                    .font(.title3.bold())
-                    .foregroundStyle(textColor)
-            }
+        ViewThatFits(in: .horizontal) {
+            wideLayout
+            compactLayout
+        }
+    }
 
-            Spacer()
+    private var wideLayout: some View {
+        HStack(alignment: .center, spacing: 12) {
+            dateLabels
+            Spacer(minLength: 8)
+            trailingContent
+        }
+    }
 
-            // In RTL locale (Hebrew), trailing is on the left (matches weather_button_marked.png)
-            if isLoading && display == nil {
-                ProgressView().tint(textColor)
-            } else {
-                WeatherHeaderButton(
-                    cityName: cityName,
-                    display: display,
-                    textColor: textColor,
-                    action: onWeatherTap
-                )
+    private var compactLayout: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            dateLabels
+            HStack {
+                Spacer()
+                trailingContent
             }
+        }
+    }
+
+    private var dateLabels: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(weekdayString(from: date))
+                .font(.subheadline)
+                .foregroundStyle(textColor.opacity(0.85))
+            Text(hebrewDateString(from: date))
+                .font(.title3.bold())
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+        }
+    }
+
+    @ViewBuilder
+    private var trailingContent: some View {
+        if isLoading && display == nil {
+            ProgressView().tint(textColor)
+        } else if display != nil {
+            WeatherHeaderButton(
+                cityName: cityName,
+                display: display,
+                textColor: textColor,
+                action: onWeatherTap
+            )
+        } else {
+            HStack(spacing: 4) {
+                Image(systemName: "location.fill")
+                Text(cityName)
+            }
+            .font(.subheadline)
+            .foregroundStyle(textColor.opacity(0.9))
+            .lineLimit(1)
         }
     }
 

@@ -240,47 +240,53 @@ public struct SolarMini: View {
                 size: geometry.size,
                 margin: 10,
                 base: geometry.size.height - 12,
-                arcHeight: geometry.size.height - 24
+                arcHeight: geometry.size.height - 24,
+                isRTL: isRTL
             )
-            let p = progress
+            let p = phase.progress
 
             ZStack {
                 arc.fullPath()
                     .stroke(Color.secondary.opacity(0.25), style: StrokeStyle(lineWidth: 2, lineCap: .round))
 
-                if p > 0 {
+                if phase.isDaylight && p > 0 {
                     arc.completedPath(progress: p)
                         .stroke(
                             LinearGradient(
-                                colors: [Color.yellow, Color.orange],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                                colors: isRTL ? [Color.orange, Color.yellow] : [Color.yellow, Color.orange],
+                                startPoint: isRTL ? .trailing : .leading,
+                                endPoint: isRTL ? .leading : .trailing
                             ),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round)
                         )
-                }
 
-                let sunPoint = arc.point(at: p)
-                Circle()
-                    .fill(Color.orange)
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
-                    )
-                    .shadow(color: Color.orange.opacity(0.35), radius: 4)
-                    .position(sunPoint)
+                    let sunPoint = arc.point(at: p)
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                        )
+                        .shadow(color: Color.orange.opacity(0.35), radius: 4)
+                        .position(sunPoint)
+                }
             }
         }
     }
 
-    private var progress: Double {
-        guard let snapshot else { return 0 }
+    private var isRTL: Bool {
+        let lang = Locale.autoupdatingCurrent.language.languageCode?.identifier ?? ""
+        return lang == "he" || Locale.autoupdatingCurrent.identifier.hasPrefix("he")
+    }
+
+    private var phase: SolarPhase {
+        guard let snapshot else { return .unavailable }
         let tz = snapshot.timeZone
         guard let sunrise = ZmanDayResolver.sunrise(from: snapshot.items, date: now, timeZone: tz),
               let sunset = ZmanDayResolver.sunset(from: snapshot.items, date: now, timeZone: tz) else {
-            return 0
+            return .unavailable
         }
-        return SolarArcGeometry.progress(now: now, sunrise: sunrise, sunset: sunset)
+        return SolarPhase.resolve(now: now, sunrise: sunrise, sunset: sunset)
     }
 }

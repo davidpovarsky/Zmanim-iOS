@@ -81,16 +81,22 @@ public final class WeatherSceneModel: ObservableObject {
             let currentHour = snapshot.hours.first(where: { abs($0.time.timeIntervalSince(now)) <= 3600 })
                 ?? snapshot.hours.last(where: { $0.time <= now && now.timeIntervalSince($0.time) <= 7200 })
 
-            // Determine day/night relative to actual Halachic sunrise/sunset
+            // Determine day/night relative to actual Halachic sunrise/sunset or MET symbol
+            let rawSymbol = currentHour?.symbolCode ?? "unknown"
             let isNight: Bool
             if let sunrise, let sunset, sunset > sunrise {
                 isNight = now < sunrise || now > sunset
+            } else if rawSymbol.hasSuffix("_night") {
+                isNight = true
+            } else if rawSymbol.hasSuffix("_day") {
+                isNight = false
             } else {
-                let hour = Calendar.current.component(.hour, from: now)
+                var cal = Calendar(identifier: .gregorian)
+                cal.timeZone = timeZone
+                let hour = cal.component(.hour, from: now)
                 isNight = hour < 6 || hour >= 19
             }
 
-            let rawSymbol = currentHour?.symbolCode ?? "unknown"
             let iconKey = METLocationWeatherConverter.iconKey(from: rawSymbol)
             let resolvedCondition = ZmanimWeatherDisplayAdapter.resolveSkyCondition(
                 iconKey: iconKey,
@@ -100,22 +106,10 @@ public final class WeatherSceneModel: ObservableObject {
                 now: now
             )
 
+            // Strictly authentic cloud fraction; never fabricate estimated measurements
             let clouds: Double
             if let cloudFraction = currentHour?.cloudAreaFractionPercent {
                 clouds = cloudFraction / 100.0
-            } else if let resolvedCondition {
-                switch resolvedCondition {
-                case .clearDay, .clearNight, .sunrise, .sunset:
-                    clouds = 0.0
-                case .partlyCloudyDay:
-                    clouds = 0.4
-                case .overcastDay, .cloudyNight:
-                    clouds = 0.85
-                case .rain, .snow, .thunderstorm:
-                    clouds = 0.9
-                case .fog:
-                    clouds = 0.7
-                }
             } else {
                 clouds = 0.0
             }

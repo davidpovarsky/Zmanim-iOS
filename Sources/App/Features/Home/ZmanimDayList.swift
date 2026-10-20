@@ -17,24 +17,30 @@ public struct ZmanimDayList: View {
 
             VStack(spacing: 0) {
                 ForEach(items) { item in
-                    HStack {
+                    HStack(spacing: 12) {
                         Image(systemName: item.icon)
                             .foregroundStyle(item.date > now ? Color.zmanIndigo : Color.secondary)
                             .frame(width: 28)
 
-                        VStack(alignment: .leading) {
-                            Text(item.displayTitle).font(.body.weight(.medium))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.displayTitle)
+                                .font(.body.weight(.medium))
+                                .lineLimit(1)
                             let subtitle = item.displayTitle == item.hebrewTitle ? item.englishTitle : item.hebrewTitle
                             if !subtitle.isEmpty {
-                                Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                                Text(subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                             }
                         }
 
-                        Spacer()
+                        Spacer(minLength: 8)
 
                         Text(formatTime(item.date))
                             .monospacedDigit()
                             .font(.body.weight(.semibold))
+                            .layoutPriority(1)
                     }
                     .opacity(item.date < now ? 0.48 : 1)
                     .padding(.horizontal, 14)

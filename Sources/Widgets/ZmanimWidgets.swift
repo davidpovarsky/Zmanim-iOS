@@ -20,8 +20,16 @@ struct ZmanProvider: TimelineProvider {
                 timeZone: cached.timeZone
             )
             completion(ZmanEntry(date: .now, snapshot: cached, state: nil, pageIndex: 0, pageCount: selector.pageCount))
-        } else {
+        } else if context.isPreview {
             completion(ZmanEntry(date: .now, snapshot: demoSnapshot, state: nil, pageIndex: 0, pageCount: 1))
+        } else {
+            completion(ZmanEntry(
+                date: .now,
+                snapshot: nil,
+                state: NSLocalizedString("widget.open_app_to_refresh", value: "פתח את האפליקציה לרענון", comment: ""),
+                pageIndex: 0,
+                pageCount: 1
+            ))
         }
     }
 
@@ -65,7 +73,14 @@ struct ZmanProvider: TimelineProvider {
 
             if case .authorized = state {
                 if let location = await fetcher.requestOneShotLocation(timeoutSeconds: 4.0) {
-                    let timeZone = TimeZone.current
+                    var resolvedZone: TimeZone? = nil
+                    if let cached, abs(cached.latitude - location.coordinate.latitude) < 0.2, abs(cached.longitude - location.coordinate.longitude) < 0.2 {
+                        resolvedZone = cached.timeZone
+                    } else if let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location),
+                              let tz = placemarks.first?.timeZone {
+                        resolvedZone = tz
+                    }
+                    let timeZone = resolvedZone ?? TimeZone.current
                     do {
                         let items = try await HebcalService.fetchDays(
                             location: location,

@@ -11,12 +11,28 @@ import SwiftUI
 
 extension View {
     @ViewBuilder
-    func clearGlassEffectIfAvailable(in shape: some Shape = Capsule()) -> some View {
-        self.background(Color(uiColor: .secondarySystemBackground), in: shape)
+    public func clearGlassEffectIfAvailable(in shape: some Shape = Capsule()) -> some View {
+        #if canImport(SwiftUI)
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.clear, in: shape)
+        } else {
+            self.background(.ultraThinMaterial, in: shape)
+        }
+        #else
+        self.background(.ultraThinMaterial, in: shape)
+        #endif
     }
 
     @ViewBuilder
-    func regularGlassEffectIfAvailable(in shape: some Shape = Capsule()) -> some View {
+    public func regularGlassEffectIfAvailable(in shape: some Shape = Capsule()) -> some View {
+        #if canImport(SwiftUI)
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(.regularMaterial, in: shape)
+        }
+        #else
         self.background(.regularMaterial, in: shape)
+        #endif
     }
 }

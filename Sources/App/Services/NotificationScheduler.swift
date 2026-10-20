@@ -41,15 +41,17 @@ enum NotificationScheduler {
     static func schedule(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
-        // Only remove ordinary daily scheduled notifications. Do NOT remove active snoozes or tests.
-        let toRemove = pending.map(\.identifier).filter { $0.hasPrefix("zmanim.daily.") }
+        // Only remove ordinary daily and special scheduled notifications. Do NOT remove active snoozes or tests.
+        let toRemove = pending.map(\.identifier).filter { $0.hasPrefix("zmanim.daily.") || $0.hasPrefix("zmanim.special.") }
         center.removePendingNotificationRequests(withIdentifiers: toRemove)
+
+        let now = Date()
 
         var candidates: [(Date, NotificationRule, ZmanItem)] = []
         for rule in settings.rules where rule.isEnabled {
             for item in items where item.key == rule.zmanKey {
                 let fire = item.date.addingTimeInterval(TimeInterval(rule.offsetMinutes * 60))
-                if fire > Date().addingTimeInterval(2) {
+                if fire > now.addingTimeInterval(2) {
                     candidates.append((fire, rule, item))
                 }
             }
@@ -58,6 +60,10 @@ enum NotificationScheduler {
         candidates.sort { $0.0 < $1.0 }
         for (index, candidate) in candidates.prefix(60).enumerated() {
             let (fire, rule, item) = candidate
+            let sunrise = ZmanDayResolver.sunrise(from: items, date: item.date, timeZone: timeZone)
+            let sunset = ZmanDayResolver.sunset(from: items, date: item.date, timeZone: timeZone)
+            let progress = SolarArcGeometry.progress(now: item.date, sunrise: sunrise, sunset: sunset)
+
             let content = UNMutableNotificationContent()
             content.title = rule.displayTitle
             content.body = body(rule: rule, item: item, timeZone: timeZone)
@@ -66,11 +72,44 @@ enum NotificationScheduler {
             content.userInfo = [
                 "zmanTitle": rule.displayTitle,
                 "zmanTime": item.date.timeIntervalSince1970,
-                "zmanIcon": item.icon
+                "zmanIcon": item.icon,
+                "zmanProgress": progress,
+                "sunriseTime": sunrise?.timeIntervalSince1970 ?? 0,
+                "sunsetTime": sunset?.timeIntervalSince1970 ?? 0
             ]
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, fire.timeIntervalSinceNow), repeats: false)
             try? await center.add(UNNotificationRequest(
                 identifier: "zmanim.daily.\(index).\(Int(fire.timeIntervalSince1970))",
+                content: content,
+                trigger: trigger
+            ))
+        }
+
+        // Schedule verified Shabbat and holiday notifications
+        let specialNotifications = SpecialDayNotificationPlanner.plan(
+            settings: settings,
+            items: items,
+            timeZone: timeZone,
+            now: now
+        )
+
+        for special in specialNotifications {
+            let content = UNMutableNotificationContent()
+            content.title = special.title
+            content.body = special.body
+            content.sound = .default
+            content.categoryIdentifier = categoryID
+            content.userInfo = [
+                "zmanTitle": special.title,
+                "zmanTime": special.fireDate.timeIntervalSince1970,
+                "zmanIcon": special.icon
+            ]
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, special.fireDate.timeIntervalSinceNow),
+                repeats: false
+            )
+            try? await center.add(UNNotificationRequest(
+                identifier: special.id,
                 content: content,
                 trigger: trigger
             ))

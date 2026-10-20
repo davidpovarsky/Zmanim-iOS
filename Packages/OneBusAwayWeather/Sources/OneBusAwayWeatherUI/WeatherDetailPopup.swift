@@ -10,19 +10,14 @@
 import SwiftUI
 import OneBusAwayWeatherCore
 
-/// In-SwiftUI weather card for `MapPanelRootView`'s overlay layer. Lives outside
-/// any UIKit modal hierarchy so it can coexist with the persistent floating sheet.
-/// Dismisses via backdrop tap or the floating close button; card body is
-/// interactive (the hourly strip scrolls) and never dismisses on tap.
-///
-/// `display` is read straight from the view model rather than a captured
-/// snapshot, so a refresh that lands while the popup is open updates the card
-/// under the user instead of stranding them on a frozen forecast. `isPresented`
-/// is the dismissal channel — the popup never mutates the underlying data.
+/// In-SwiftUI weather card for overlay presentations.
+/// Adapts responsively to actual container width and available height.
+/// Interactive body (the hourly strip scrolls horizontally) and dismisses
+/// via background tap or the prominent close button.
 public struct WeatherDetailPopup: View {
     public let display: WeatherDisplay?
     @Binding public var isPresented: Bool
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(display: WeatherDisplay?, isPresented: Binding<Bool>) {
         self.display = display
@@ -31,41 +26,48 @@ public struct WeatherDetailPopup: View {
 
     private let cardShape = RoundedRectangle(cornerRadius: 24, style: .continuous)
 
-    /// `HStack` in iPhone landscape (where the floating sheet covers the bottom
-    /// of the screen and a button parked below the card would be hidden);
-    /// `VStack` otherwise. Switching via `AnyLayout` keeps the subview list
-    /// identical so SwiftUI animates between the two arrangements.
-    private var stackLayout: AnyLayout {
-        verticalSizeClass == .compact
-            ? AnyLayout(HStackLayout(alignment: .center, spacing: 16))
-            : AnyLayout(VStackLayout(spacing: 16))
-    }
-
-    /// True only when there's something to render. If the VM drops weather
-    /// data (e.g. region change) while the popup is open, this collapses to
-    /// false so the dismiss animation runs and `isPresented` is reset.
     private var isShowing: Bool { isPresented && display != nil }
 
     public var body: some View {
         ZStack {
             if let current = display, isPresented {
-                Color.black.opacity(0.25)
+                Color.black.opacity(0.35)
                     .ignoresSafeArea()
                     .transition(.opacity)
                     .onTapGesture { dismiss() }
-                    // The scrim is a dismiss target for touch only; VoiceOver uses
-                    // the close button or the escape gesture below.
                     .accessibilityHidden(true)
 
-                stackLayout {
-                    WeatherCard(display: current, shape: cardShape)
-                    closeButton
+                GeometryReader { proxy in
+                    let containerWidth = proxy.size.width
+                    let containerHeight = proxy.size.height
+                    let isCompactHeight = containerHeight < 550
+                    let cardWidth = min(500, max(280, containerWidth - 32))
+                    let maxCardHeight = max(260, containerHeight - 64)
+
+                    ZStack {
+                        if isCompactHeight {
+                            HStack(alignment: .center, spacing: 16) {
+                                WeatherCard(display: current, shape: cardShape, maxHeight: maxCardHeight)
+                                    .frame(width: min(cardWidth, containerWidth - 80))
+                                closeButton
+                            }
+                        } else {
+                            VStack(spacing: 16) {
+                                WeatherCard(display: current, shape: cardShape, maxHeight: maxCardHeight)
+                                    .frame(width: cardWidth)
+                                closeButton
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
                 }
-                .frame(maxWidth: 500)
-                .padding(.horizontal, 16)
-                .transition(.scale(scale: 0.92).combined(with: .opacity))
-                // A popup over the map: keep VoiceOver inside it, and let the
-                // two-finger scrub dismiss it like any other modal.
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .scale(scale: 0.94).combined(with: .opacity)
+                )
                 .accessibilityElement(children: .contain)
                 .accessibilityAddTraits(.isModal)
                 .accessibilityAction(.escape) { dismiss() }
@@ -73,8 +75,6 @@ public struct WeatherDetailPopup: View {
         }
         .animation(.smooth(duration: 0.25), value: isShowing)
         .onChange(of: display) { _, newValue in
-            // Reset the presentation flag if the underlying data disappeared
-            // (e.g. user crossed a region boundary while the popup was open).
             if newValue == nil && isPresented {
                 isPresented = false
             }
@@ -86,11 +86,10 @@ public struct WeatherDetailPopup: View {
             dismiss()
         } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.primary)
-                .frame(width: 36, height: 36)
-                // 44pt hit area without growing the drawn circle.
-                .contentShape(Circle().inset(by: -4))
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(Strings.close))
@@ -108,31 +107,35 @@ public struct WeatherDetailPopup: View {
 private struct WeatherCard: View {
     let display: WeatherDisplay
     let shape: RoundedRectangle
+    var maxHeight: CGFloat = 520
 
     var body: some View {
-        VStack(spacing: 0) {
-            HeaderRow(header: display.header)
-                .padding(16)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                HeaderRow(header: display.header)
+                    .padding(16)
 
-            Divider()
+                Divider()
 
-            HourlyStrip(entries: display.hourly)
-                .padding(.vertical, 12)
+                HourlyStrip(entries: display.hourly)
+                    .padding(.vertical, 12)
 
-            Divider()
+                Divider()
 
-            StatsRow(stats: display.stats)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-
-            if let attribution = display.sourceAttribution {
-                Text(attribution)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                StatsRow(stats: display.stats)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
+                    .padding(.vertical, 12)
+
+                if let attribution = display.sourceAttribution {
+                    Text(attribution)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                }
             }
         }
+        .frame(maxHeight: maxHeight)
         .background(.ultraThinMaterial, in: shape)
         .clearGlassEffectIfAvailable(in: shape)
     }
@@ -151,12 +154,15 @@ private struct HeaderRow: View {
                 Text(header.regionName)
                     .font(.title3.bold())
                     .accessibilityAddTraits(.isHeader)
+                    .lineLimit(1)
                 Text(header.conditionSummary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Text(header.chanceOfRainText)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 8)
@@ -164,10 +170,12 @@ private struct HeaderRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(header.currentTemp)
                     .font(.system(size: 34, weight: .semibold))
+                    .layoutPriority(1)
                 if let hilo = header.highLowText {
                     Text(hilo)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .layoutPriority(1)
                 }
             }
         }
@@ -198,13 +206,13 @@ private struct HourlyCell: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(entry.timeLabel)
-                .font(.caption)
-                .fontWeight(entry.isNow ? .bold : .regular)
-                .foregroundStyle(entry.isNow ? .primary : .secondary)
-            WeatherIcon(iconName: entry.iconName, size: 22)
-            Text(entry.temp)
-                .font(.subheadline)
-                .fontWeight(entry.isNow ? .bold : .regular)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            WeatherIcon(iconName: entry.iconName, size: 24)
+
+            Text(entry.tempLabel)
+                .font(.subheadline.weight(.medium))
         }
         .accessibilityElement(children: .combine)
     }
@@ -216,77 +224,80 @@ private struct StatsRow: View {
     let stats: WeatherDisplay.Stats
 
     var body: some View {
-        HStack {
-            stat(
-                systemImage: "wind",
-                tint: .secondary,
-                value: stats.windText,
-                label: OBALoc("weather.stat.wind", value: "Wind speed", comment: "VoiceOver label for the wind speed stat on the weather card.")
+        HStack(alignment: .top, spacing: 12) {
+            StatSlot(
+                title: Strings.feelsLike,
+                value: stats.feelsLikeTemp,
+                iconName: "thermometer.medium"
             )
-            Spacer()
-            stat(
-                systemImage: "drop.fill",
-                tint: .blue,
-                value: stats.precipText,
-                label: OBALoc("weather.stat.precip", value: "Chance of precipitation", comment: "VoiceOver label for the precipitation chance stat on the weather card.")
-            )
-            Spacer()
-            stat(
-                systemImage: "thermometer.medium",
-                tint: .red,
-                value: stats.feelsLikeText,
-                label: OBALoc("weather.stat.feels_like", value: "Feels like", comment: "VoiceOver label for the feels-like temperature stat on the weather card.")
-            )
-        }
-    }
 
-    private func stat(systemImage: String, tint: Color, value: String, label: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .foregroundStyle(tint)
-            Text(value)
-                .font(.subheadline)
+            Divider()
+
+            StatSlot(
+                title: Strings.humidity,
+                value: stats.humidityPercent,
+                iconName: "humidity.fill"
+            )
+
+            Divider()
+
+            StatSlot(
+                title: Strings.wind,
+                value: stats.windSpeed,
+                iconName: "wind"
+            )
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(String(
-            format: OBALoc("weather.stat.a11y_fmt", value: "%1$@: %2$@", comment: "VoiceOver label for a weather card stat: {stat name}: {value}, e.g. Wind speed: 10 mph. Use the language's colon convention."),
-            label, value
-        )))
+        .frame(maxWidth: .infinity)
     }
 }
 
-// MARK: - Weather Icon
+private struct StatSlot: View {
+    let title: String
+    let value: String
+    let iconName: String
 
-/// Pulls the SF Symbol name from `WeatherFormatter` (single source of truth) and
-/// pairs it with a SwiftUI-only color palette. The palette lives here rather
-/// than in OBAKitCore because `Color` isn't reachable from the extension-safe
-/// core; `WeatherIconPalette.colors` is `internal` so tests can assert every
-/// key in `WeatherFormatter.knownIconKeys` also has a palette entry.
+    var body: some View {
+        VStack(alignment: .center, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: iconName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Text(value)
+                .font(.callout.weight(.medium))
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct WeatherIcon: View {
     let iconName: String
     let size: CGFloat
 
     var body: some View {
-        let symbol = WeatherFormatter.systemImageName(for: iconName)
-        let palette = WeatherIconPalette.colors[iconName] ?? (.gray, .clear)
-        Image(systemName: symbol)
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(palette.primary, palette.secondary)
+        Image(systemName: iconName)
+            .symbolRenderingMode(.multicolor)
             .font(.system(size: size))
+            .frame(width: size, height: size)
     }
 }
 
-public enum WeatherIconPalette {
-    public static let colors: [String: (primary: Color, secondary: Color)] = [
-        "clear-day": (.yellow, .orange),
-        "clear-night": (.gray, .yellow),
-        "partly-cloudy-day": (.yellow, .gray),
-        "partly-cloudy-night": (.gray, .yellow),
-        "cloudy": (.gray, .secondary),
-        "rain": (.gray, .blue),
-        "sleet": (.gray, .blue),
-        "snow": (.gray, .white),
-        "wind": (.gray, .clear),
-        "fog": (.gray, .secondary)
-    ]
+private enum Strings {
+    static var close: String {
+        OBALoc.string("close", value: "סגור", comment: "Close button")
+    }
+    static var feelsLike: String {
+        OBALoc.string("weather.feels_like", value: "מרגיש כמו", comment: "Feels like")
+    }
+    static var humidity: String {
+        OBALoc.string("weather.humidity", value: "לחות", comment: "Humidity")
+    }
+    static var wind: String {
+        OBALoc.string("weather.wind", value: "רוח", comment: "Wind")
+    }
 }
