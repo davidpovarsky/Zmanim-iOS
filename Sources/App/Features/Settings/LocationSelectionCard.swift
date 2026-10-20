@@ -1,159 +1,154 @@
 import SwiftUI
 
 public struct LocationSelectionCard: View {
-    @Binding public var locationMode: LocationMode
-    @Binding public var fixedCity: String
-    public let currentCityName: String
-    public let onSelectLocation: (ResolvedLocation) -> Void
+    @ObservedObject public var model: AppModel
 
-    @StateObject private var searchService = CitySearchService()
-    @State private var searchText: String = ""
-    @State private var isResolving: Bool = false
-    @State private var selectionError: String? = nil
+    @State private var isAddCitySheetPresented: Bool = false
+    @State private var cityToDelete: SavedCity? = nil
+    @State private var isConfirmingDelete: Bool = false
 
-    public init(
-        locationMode: Binding<LocationMode>,
-        fixedCity: Binding<String>,
-        currentCityName: String,
-        onSelectLocation: @escaping (ResolvedLocation) -> Void
-    ) {
-        self._locationMode = locationMode
-        self._fixedCity = fixedCity
-        self.currentCityName = currentCityName
-        self.onSelectLocation = onSelectLocation
+    public init(model: AppModel) {
+        self.model = model
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Label(LocalizedStringKey("settings.my_city"), systemImage: "location.circle.fill")
                 .font(.title2.bold())
                 .foregroundStyle(Color.zmanInk)
 
-            Picker(String(localized: "settings.location_source"), selection: $locationMode) {
-                ForEach(LocationMode.allCases) {
-                    Text($0.title).tag($0)
-                }
-            }
-            .pickerStyle(.segmented)
+            Text(LocalizedStringKey("settings.location_source"))
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
 
-            if locationMode == .fixed {
-                fixedCityContent
-            } else {
-                HStack(spacing: 6) {
+            // 1. Current GPS Location Option
+            Button {
+                Task {
+                    await model.setDefaultLocationChoice(.current)
+                }
+            } label: {
+                HStack {
                     Image(systemName: "location.fill")
                         .foregroundStyle(Color.zmanOrange)
-                    Text(currentCityName)
-                        .foregroundStyle(Color.zmanInk)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(LocalizedStringKey("location.current"))
+                            .font(.headline)
+                            .foregroundStyle(Color.zmanInk)
+                        Text(model.cityName)
+                            .font(.caption)
+                            .foregroundStyle(Color.secondary)
+                    }
+                    Spacer()
+                    if model.locationPreferences.defaultChoice.isCurrent {
+                        Label(LocalizedStringKey("location.default"), systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(Color.zmanIndigo)
+                    }
                 }
-                .font(.subheadline)
+                .padding(12)
+                .background(Color.zmanBackground, in: RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
+
+            // 2. Saved Cities Section
+            if !model.locationPreferences.savedCities.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(LocalizedStringKey("location.saved_cities"))
+                        .font(.subheadline.bold())
+                        .foregroundStyle(Color.zmanInk)
+
+                    ForEach(model.locationPreferences.savedCities) { city in
+                        let isDefault = model.locationPreferences.defaultChoice.savedCityID == city.id
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(city.name)
+                                    .font(.headline)
+                                    .foregroundStyle(Color.zmanInk)
+                                Text(city.timeZoneID)
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                            Spacer()
+
+                            if isDefault {
+                                Label(LocalizedStringKey("location.default"), systemImage: "checkmark.circle.fill")
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(Color.zmanIndigo)
+                            } else {
+                                Button {
+                                    Task {
+                                        await model.setDefaultLocationChoice(.savedCity(id: city.id))
+                                    }
+                                } label: {
+                                    Text(LocalizedStringKey("location.set_default"))
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.zmanIndigo.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(Color.zmanIndigo)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Button {
+                                cityToDelete = city
+                                isConfirmingDelete = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundStyle(.red.opacity(0.8))
+                                    .padding(6)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(LocalizedStringKey("location.remove_city"))
+                        }
+                        .padding(10)
+                        .background(Color.zmanBackground, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            }
+
+            // 3. Add City Button
+            Button {
+                isAddCitySheetPresented = true
+            } label: {
+                Label(LocalizedStringKey("location.add_city"), systemImage: "plus.circle.fill")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.bordered)
+            .tint(Color.zmanIndigo)
         }
         .padding(18)
         .zmanCard()
-    }
-
-    @ViewBuilder
-    private var fixedCityContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(String(localized: "settings.search_city"), text: $searchText)
-                    .textFieldStyle(.plain)
-                    .onChange(of: searchText) { _, newValue in
-                        selectionError = nil
-                        searchService.updateQuery(newValue)
-                    }
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                        searchService.clear()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(10)
-            .background(Color.zmanBackground, in: RoundedRectangle(cornerRadius: 12))
-
-            if isResolving {
-                HStack {
-                    ProgressView()
-                    Text(NSLocalizedString("settings.resolving_location", value: "מאמת מיקום…", comment: ""))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-
-            if let error = selectionError ?? searchService.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            if !searchService.suggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(searchService.suggestions) { suggestion in
-                        Button {
-                            select(suggestion: suggestion)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(suggestion.title)
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(Color.zmanInk)
-                                    if !suggestion.subtitle.isEmpty {
-                                        Text(suggestion.subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.left")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 4)
-                        }
-                        .buttonStyle(.plain)
-
-                        if suggestion.id != searchService.suggestions.last?.id {
-                            Divider()
-                        }
-                    }
-                }
-                .padding(8)
-                .background(Color.zmanBackground, in: RoundedRectangle(cornerRadius: 12))
-            } else if !fixedCity.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.zmanOrange)
-                    Text(fixedCity)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(Color.zmanInk)
+        .sheet(isPresented: $isAddCitySheetPresented) {
+            AddSavedCitySheet { resolved in
+                Task {
+                    let newCity = await model.addSavedCity(
+                        name: resolved.displayName,
+                        latitude: resolved.latitude,
+                        longitude: resolved.longitude,
+                        timeZoneID: resolved.timeZoneID
+                    )
+                    await model.setDefaultLocationChoice(.savedCity(id: newCity.id))
+                    await model.selectActiveChoice(.savedCity(id: newCity.id))
                 }
             }
         }
-    }
-
-    private func select(suggestion: CitySearchSuggestion) {
-        isResolving = true
-        selectionError = nil
-        Task {
-            do {
-                let resolved = try await searchService.resolve(suggestion: suggestion)
-                onSelectLocation(resolved)
-                fixedCity = resolved.displayName
-                searchText = ""
-                searchService.clear()
-            } catch {
-                selectionError = error.localizedDescription
+        .confirmationDialog(
+            String(format: NSLocalizedString("location.confirm_remove_city", value: "האם להסיר את %@ מרשימת הערים השמורות?", comment: ""), cityToDelete?.name ?? ""),
+            isPresented: $isConfirmingDelete,
+            titleVisibility: .visible
+        ) {
+            if let city = cityToDelete {
+                Button(LocalizedStringKey("location.remove"), role: .destructive) {
+                    Task {
+                        await model.removeSavedCity(id: city.id)
+                    }
+                }
             }
-            isResolving = false
+            Button(LocalizedStringKey("location.cancel"), role: .cancel) {}
         }
     }
 }

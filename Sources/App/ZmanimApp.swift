@@ -102,7 +102,7 @@ struct WidgetHarnessView: View {
             updatedAt: Date(),
             items: model.allItems
         )
-        let entry = ZmanEntry(date: Date(), snapshot: snapshot, state: nil)
+        let entry = ZmanEntry(date: Date(), snapshot: snapshot, state: nil, isGPS: model.isGPSActive)
 
         switch family.lowercased() {
         case "small":

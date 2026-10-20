@@ -7,6 +7,7 @@ public struct HomeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @State private var isWeatherPopupPresented = false
+    @State private var isAddCitySheetPresented = false
 
     public init() {}
 
@@ -31,6 +32,13 @@ public struct HomeView: View {
                     display: model.weatherModel.weatherDisplay,
                     isPresented: $isWeatherPopupPresented
                 )
+            }
+            .sheet(isPresented: $isAddCitySheetPresented) {
+                AddSavedCitySheet { resolved in
+                    Task {
+                        await model.selectFixedLocation(resolved)
+                    }
+                }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
@@ -69,9 +77,19 @@ public struct HomeView: View {
                     date: timelineDate,
                     timeZone: model.timeZone,
                     cityName: model.cityName,
+                    isGPSActive: model.isGPSActive,
+                    activeChoice: model.activeChoice,
+                    defaultChoice: model.locationPreferences.defaultChoice,
+                    savedCities: model.locationPreferences.savedCities,
                     display: model.weatherModel.weatherDisplay,
                     isLoading: model.isLoading,
                     textColor: headerTextColor,
+                    onSelectChoice: { choice in
+                        Task { await model.selectActiveChoice(choice) }
+                    },
+                    onAddCityTap: {
+                        isAddCitySheetPresented = true
+                    },
                     onWeatherTap: {
                         isWeatherPopupPresented = true
                     }
@@ -109,38 +127,32 @@ public struct HomeView: View {
         .onAppear {
             model.checkDayRollover(now: timelineDate)
         }
-        .onChange(of: timelineDate) { _, newDate in
-            model.checkDayRollover(now: newDate)
-        }
     }
 
     @ViewBuilder
     private func homeBackdrop(date: Date, sunrise: Date?, sunset: Date?) -> some View {
-        ZStack(alignment: .top) {
-            Color.zmanBackground.ignoresSafeArea()
-            if model.weatherModel.isAvailable {
-                ZmanimSkyBackdrop(
-                    date: date,
-                    timeZone: model.timeZone,
-                    sunrise: sunrise,
-                    sunset: sunset,
-                    condition: model.weatherModel.condition,
-                    cloudCover: model.weatherModel.cloudCover,
-                    isPaused: scenePhase != .active
-                )
-            }
-        }
+        ZmanimSkyBackdrop(
+            condition: model.weatherModel.condition,
+            cloudCover: model.weatherModel.cloudCover,
+            now: date,
+            sunrise: sunrise,
+            sunset: sunset,
+            timeZone: model.timeZone
+        )
     }
 
     private var homeAttributionFooter: some View {
         VStack(spacing: 4) {
-            Text("zmanim_data_source")
-            if model.weatherModel.isAvailable {
-                Text(model.weatherModel.weatherDisplay?.sourceAttribution ?? WeatherSnapshot.attribution)
+            Text(LocalizedStringKey("zmanim_data_source"))
+                .font(.caption2)
+                .foregroundStyle(Color.secondary.opacity(0.8))
+
+            if model.weatherModel.weatherDisplay != nil {
+                Text(LocalizedStringKey("weather.source_attribution"))
+                    .font(.caption2)
+                    .foregroundStyle(Color.secondary.opacity(0.8))
             }
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.bottom, 24)
+        .padding(.vertical, 8)
     }
 }

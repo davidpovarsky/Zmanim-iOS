@@ -11,14 +11,7 @@ struct NotificationSettingsView: View {
                         Task { await model.sendTestNotification() }
                     }
 
-                    LocationSelectionCard(
-                        locationMode: $model.settings.locationMode,
-                        fixedCity: $model.settings.fixedCity,
-                        currentCityName: model.cityName,
-                        onSelectLocation: { resolved in
-                            Task { await model.selectFixedLocation(resolved) }
-                        }
-                    )
+                    LocationSelectionCard(model: model)
 
                     SpecialDaysCard(
                         masterEnabled: $model.settings.specialDaysMasterEnabled,

@@ -8,6 +8,9 @@ public struct ZmanEntry: TimelineEntry, Sendable {
     public let pageIndex: Int
     public let pageCount: Int
     public let expiresAt: Date?
+    public let isGPS: Bool
+    public let locationKey: String
+    public let customCityName: String?
 
     public init(
         date: Date,
@@ -15,7 +18,10 @@ public struct ZmanEntry: TimelineEntry, Sendable {
         state: String?,
         pageIndex: Int = 0,
         pageCount: Int = 1,
-        expiresAt: Date? = nil
+        expiresAt: Date? = nil,
+        isGPS: Bool = false,
+        locationKey: String = "default",
+        customCityName: String? = nil
     ) {
         self.date = date
         self.snapshot = snapshot
@@ -23,6 +29,9 @@ public struct ZmanEntry: TimelineEntry, Sendable {
         self.pageIndex = pageIndex
         self.pageCount = pageCount
         self.expiresAt = expiresAt
+        self.isGPS = isGPS
+        self.locationKey = locationKey
+        self.customCityName = customCityName
     }
 
     public var next: ZmanItem? {
@@ -47,6 +56,13 @@ public struct ZmanWidgetView: View {
 
     private var activeFamily: WidgetFamily {
         explicitFamily ?? envFamily
+    }
+
+    private var displayCityName: String {
+        if let custom = entry.customCityName, !custom.isEmpty {
+            return custom
+        }
+        return entry.snapshot?.cityName ?? ""
     }
 
     public var body: some View {
@@ -92,8 +108,13 @@ public struct ZmanWidgetView: View {
                 Text("--:--").font(.title.monospacedDigit())
             }
             Spacer()
-            HStack {
-                Text(entry.snapshot?.cityName ?? "").font(.caption2).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                if entry.isGPS {
+                    Image(systemName: "location.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(displayCityName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Button(intent: ToggleQuickReminderIntent()) {
                     Image(systemName: AppGroupStore.quickReminderEnabled ? "bell.fill" : "bell")
@@ -106,7 +127,14 @@ public struct ZmanWidgetView: View {
     private var medium: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text(entry.snapshot?.cityName.isEmpty == false ? entry.snapshot!.cityName : NSLocalizedString("daily_zmanim", value: "זמני היום", comment: "")).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if entry.isGPS {
+                        Image(systemName: "location.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(!displayCityName.isEmpty ? displayCityName : NSLocalizedString("daily_zmanim", value: "זמני היום", comment: "")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
                 if let next = entry.next {
                     Text(next.displayTitle).font(.title3.bold())
                     Text(nextTime).font(.title.monospacedDigit().bold())
@@ -131,57 +159,71 @@ public struct ZmanWidgetView: View {
             HStack {
                 Text("daily_zmanim").font(.title2.bold())
                 Spacer()
-                Text(entry.snapshot?.cityName ?? "").foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if entry.isGPS {
+                        Image(systemName: "location.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(displayCityName).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
 
             if let snapshot = entry.snapshot {
                 SolarMini(snapshot: snapshot, now: entry.date).frame(height: 85)
 
-                let selector = WidgetDaySelector(
+                let pager = UpcomingZmanPager(
                     allItems: snapshot.items,
                     referenceDate: entry.date,
                     timeZone: snapshot.timeZone
                 )
-                let itemsToShow = selector.items(for: entry.pageIndex)
+                let itemsToShow = pager.items(for: entry.pageIndex)
 
                 VStack(spacing: 6) {
-                    ForEach(itemsToShow) { item in
+                    ForEach(itemsToShow) { upcoming in
                         HStack {
-                            Image(systemName: item.icon)
+                            Image(systemName: upcoming.item.icon)
                                 .font(.system(size: 15))
                                 .frame(width: 25)
-                                .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
-                            Text(item.displayTitle)
+                                .foregroundStyle(upcoming.item.date > entry.date ? Color.primary : Color.secondary)
+                            Text(upcoming.item.displayTitle)
                                 .font(.subheadline)
-                                .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
+                                .foregroundStyle(upcoming.item.date > entry.date ? Color.primary : Color.secondary)
+                            if let label = upcoming.dayLabel {
+                                Text(label)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.orange.opacity(0.18))
+                                    .foregroundStyle(Color.orange)
+                                    .clipShape(Capsule())
+                            }
                             Spacer()
-                            Text(time(item.date))
+                            Text(time(upcoming.item.date))
                                 .monospacedDigit()
                                 .font(.subheadline.bold())
-                                .foregroundStyle(item.date > entry.date ? Color.primary : Color.secondary)
+                                .foregroundStyle(upcoming.item.date > entry.date ? Color.primary : Color.secondary)
                         }
                     }
                 }
 
                 Spacer(minLength: 4)
 
-                // Interactive paging controls (chevron down / chevron up) as marked in reference image
-                if selector.pageCount > 1 {
+                // Interactive cyclic paging controls (chevron down / chevron up)
+                if pager.pageCount > 1 {
                     HStack {
                         Spacer()
-                        if entry.pageIndex > 0 {
-                            Button(intent: PreviousWidgetPageIntent()) {
-                                Image(systemName: "chevron.up")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(Color.secondary)
-                                    .frame(width: 44, height: 28)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(String(localized: "widget.a11y.previous_page"))
+                        Button(intent: PreviousWidgetPageIntent(locationKey: entry.locationKey)) {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.secondary)
+                                .frame(width: 44, height: 28)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "widget.a11y.previous_page"))
 
-                        Button(intent: NextWidgetPageIntent()) {
+                        Button(intent: NextWidgetPageIntent(locationKey: entry.locationKey)) {
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Color.secondary)

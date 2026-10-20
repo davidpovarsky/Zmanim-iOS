@@ -5,26 +5,44 @@ public struct HomeHeader: View {
     public let date: Date
     public let timeZone: TimeZone
     public let cityName: String
+    public let isGPSActive: Bool
+    public let activeChoice: LocationChoice
+    public let defaultChoice: LocationChoice
+    public let savedCities: [SavedCity]
     public let display: WeatherDisplay?
     public let isLoading: Bool
     public let textColor: Color
+    public let onSelectChoice: (LocationChoice) -> Void
+    public let onAddCityTap: () -> Void
     public let onWeatherTap: () -> Void
 
     public init(
         date: Date,
         timeZone: TimeZone,
         cityName: String,
+        isGPSActive: Bool = true,
+        activeChoice: LocationChoice = .current,
+        defaultChoice: LocationChoice = .current,
+        savedCities: [SavedCity] = [],
         display: WeatherDisplay?,
         isLoading: Bool,
         textColor: Color,
+        onSelectChoice: @escaping (LocationChoice) -> Void = { _ in },
+        onAddCityTap: @escaping () -> Void = {},
         onWeatherTap: @escaping () -> Void
     ) {
         self.date = date
         self.timeZone = timeZone
         self.cityName = cityName
+        self.isGPSActive = isGPSActive
+        self.activeChoice = activeChoice
+        self.defaultChoice = defaultChoice
+        self.savedCities = savedCities
         self.display = display
         self.isLoading = isLoading
         self.textColor = textColor
+        self.onSelectChoice = onSelectChoice
+        self.onAddCityTap = onAddCityTap
         self.onWeatherTap = onWeatherTap
     }
 
@@ -39,7 +57,7 @@ public struct HomeHeader: View {
         HStack(alignment: .center, spacing: 12) {
             dateLabels
             Spacer(minLength: 8)
-            trailingContent
+            trailingControls
         }
     }
 
@@ -48,7 +66,7 @@ public struct HomeHeader: View {
             dateLabels
             HStack {
                 Spacer()
-                trailingContent
+                trailingControls
             }
         }
     }
@@ -66,24 +84,31 @@ public struct HomeHeader: View {
     }
 
     @ViewBuilder
-    private var trailingContent: some View {
-        if isLoading && display == nil {
-            ProgressView().tint(textColor)
-        } else if display != nil {
-            WeatherHeaderButton(
-                cityName: cityName,
-                display: display,
+    private var trailingControls: some View {
+        HStack(spacing: 6) {
+            HomeLocationMenu(
+                currentCityName: cityName,
+                isGPSActive: isGPSActive,
+                activeChoice: activeChoice,
+                defaultChoice: defaultChoice,
+                savedCities: savedCities,
                 textColor: textColor,
-                action: onWeatherTap
+                onSelectChoice: onSelectChoice,
+                onAddCityTap: onAddCityTap
             )
-        } else {
-            HStack(spacing: 4) {
-                Image(systemName: "location.fill")
-                Text(cityName)
+
+            if let display {
+                Text("·")
+                    .foregroundStyle(textColor.opacity(0.60))
+
+                WeatherHeaderButton(
+                    display: display,
+                    textColor: textColor,
+                    action: onWeatherTap
+                )
+            } else if isLoading {
+                ProgressView().tint(textColor)
             }
-            .font(.subheadline)
-            .foregroundStyle(textColor.opacity(0.9))
-            .lineLimit(1)
         }
     }
 
@@ -99,11 +124,14 @@ public struct HomeHeader: View {
     }
 
     private func hebrewDateString(from date: Date) -> String {
+        var cal = Calendar(identifier: .hebrew)
+        cal.timeZone = timeZone
         let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .hebrew)
+        formatter.calendar = cal
         formatter.timeZone = timeZone
-        formatter.locale = Locale.autoupdatingCurrent
+        formatter.locale = Locale(identifier: "he_IL")
         formatter.dateStyle = .long
+        formatter.timeStyle = .none
         return formatter.string(from: date)
     }
 }

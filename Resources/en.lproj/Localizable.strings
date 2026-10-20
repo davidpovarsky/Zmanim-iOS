@@ -17,6 +17,22 @@
 
 "location.current" = "Current Location";
 "location.fixed" = "Fixed City";
+"location.locating" = "Locating...";
+"location.updating" = "Updating location...";
+"location.unavailable" = "Location unavailable";
+"location.permission_required" = "Location permission required";
+"location.services_disabled" = "Location services disabled";
+"location.geocode_failed" = "Unable to determine current location";
+"location.default" = "Default";
+"location.set_default" = "Set as Default";
+"location.add_city" = "Add City...";
+"location.saved_cities" = "Saved Cities";
+"location.remove_city" = "Remove City";
+"location.city_removed_widget" = "City was removed — edit widget";
+"location.confirm_remove_city" = "Remove %@ from saved cities?";
+"location.cancel" = "Cancel";
+"location.remove" = "Remove";
+"location.menu_a11y" = "Current location: %@. Tap to change location.";
 
 "settings.personal_alerts" = "✦  Personal Alerts  ✦";
 "settings.my_notifications" = "My Notifications";
@@ -25,6 +41,7 @@
 "settings.my_city" = "My City";
 "settings.location_source" = "Location Source";
 "settings.search_city" = "Search city or town";
+"settings.resolving_location" = "Resolving location...";
 "settings.shabbat_holiday_alert" = "Shabbat & Holiday Alerts";
 "settings.shabbat_holiday_desc" = "Entry and exit times for your city";
 "settings.shabbat" = "Shabbat";
@@ -63,6 +80,17 @@
 "widget.permission_required" = "Location permission required";
 "widget.updated_at_format" = "Updated at %@";
 "widget.open_app_to_refresh_city_format" = "Open app to refresh %@";
+"widget.location_option.app_default" = "App Default";
+"widget.location_option.current" = "Current Location (GPS)";
+"widget.location_option.saved_city" = "Saved City";
+"widget.location_label" = "Location";
+"widget.page.next" = "Next Page";
+"widget.page.previous" = "Previous Page";
+"widget.day.tomorrow" = "Tomorrow";
+"widget.configuration_title" = "Widget Location Configuration";
+"widget.configuration_desc" = "Choose the location source for this widget: App Default, Current GPS, or a specific saved city.";
+"widget.location_param_title" = "Location";
+"widget.location_entity_name" = "Location";
 "widget.intent.next_page_title" = "Next Widget Page";
 "widget.intent.next_page_desc" = "Pages to the next five zmanim in the widget.";
 "widget.intent.prev_page_title" = "Previous Widget Page";
