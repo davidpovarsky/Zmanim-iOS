@@ -55,13 +55,19 @@ public struct ZmanDefinition: Hashable, Sendable {
 public enum LocationMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case current, fixed
     public var id: String { rawValue }
-    public var title: String {
+
+    public func localizedTitle(locale: Locale = .autoupdatingCurrent) -> String {
+        let isEnglish = (locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")) == "en"
         switch self {
         case .current:
-            return NSLocalizedString("location.current", value: "המיקום הנוכחי", comment: "")
+            return isEnglish ? "Current Location" : "המיקום הנוכחי"
         case .fixed:
-            return NSLocalizedString("location.fixed", value: "עיר קבועה", comment: "")
+            return isEnglish ? "Fixed City" : "עיר קבועה"
         }
+    }
+
+    public var title: String {
+        localizedTitle()
     }
 }
 
