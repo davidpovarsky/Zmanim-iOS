@@ -259,8 +259,8 @@ struct ZmanimWidget: Widget {
             ZmanWidgetView(entry: entry)
                 .containerBackground(Color(red: 0.972, green: 0.966, blue: 0.936), for: .widget)
         }
-        .configurationDisplayName(LocalizedStringResource("widget.display_name", defaultValue: "זמני היום"))
-        .description(LocalizedStringResource("widget.description", defaultValue: "הזמן הבא, מסלול השמש ודפדוף זמני היום."))
+        .configurationDisplayName(LocalizedStringKey("widget.display_name"))
+        .description(LocalizedStringKey("widget.description"))
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
 }
