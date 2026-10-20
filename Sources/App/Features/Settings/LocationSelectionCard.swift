@@ -81,7 +81,7 @@ public struct LocationSelectionCard: View {
             if isResolving {
                 HStack {
                     ProgressView()
-                    Text("settings.resolving_location", value: "מאמת מיקום…", comment: "")
+                    Text(NSLocalizedString("settings.resolving_location", value: "מאמת מיקום…", comment: ""))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
