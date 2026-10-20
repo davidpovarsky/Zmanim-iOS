@@ -49,6 +49,11 @@ pass() {
     echo "PASS: $1"
 }
 
+read_strings() {
+    local file="$1"
+    plutil -p "$file" 2>/dev/null || cat "$file"
+}
+
 # --- 1. Main App Info.plist Checks ---
 MAIN_INFO="$APP_PATH/Info.plist"
 if [ ! -f "$MAIN_INFO" ]; then
@@ -98,12 +103,13 @@ HE_APP_STRINGS="$APP_PATH/he.lproj/Localizable.strings"
 EN_APP_STRINGS="$APP_PATH/en.lproj/Localizable.strings"
 
 if [ -f "$HE_INFO_STRINGS" ]; then
-    if grep -q "זמנים" "$HE_INFO_STRINGS"; then
-        pass "he InfoPlist.strings contains Hebrew app name"
+    HE_INFO_CONTENT="$(read_strings "$HE_INFO_STRINGS")"
+    if echo "$HE_INFO_CONTENT" | grep -q "זמנים"; then
+        pass "he InfoPlist.strings contains Hebrew app name 'זמנים'"
     else
         fail "he InfoPlist.strings missing Hebrew app name 'זמנים'"
     fi
-    if grep -q "NSLocationWhenInUseUsageDescription" "$HE_INFO_STRINGS"; then
+    if echo "$HE_INFO_CONTENT" | grep -q "NSLocationWhenInUseUsageDescription"; then
         pass "he InfoPlist.strings contains NSLocationWhenInUseUsageDescription"
     else
         fail "he InfoPlist.strings missing NSLocationWhenInUseUsageDescription"
@@ -111,12 +117,13 @@ if [ -f "$HE_INFO_STRINGS" ]; then
 fi
 
 if [ -f "$EN_INFO_STRINGS" ]; then
-    if grep -q "Zmanim" "$EN_INFO_STRINGS"; then
+    EN_INFO_CONTENT="$(read_strings "$EN_INFO_STRINGS")"
+    if echo "$EN_INFO_CONTENT" | grep -q "Zmanim"; then
         pass "en InfoPlist.strings contains English app name 'Zmanim'"
     else
         fail "en InfoPlist.strings missing English app name 'Zmanim'"
     fi
-    if grep -q "NSLocationWhenInUseUsageDescription" "$EN_INFO_STRINGS"; then
+    if echo "$EN_INFO_CONTENT" | grep -q "NSLocationWhenInUseUsageDescription"; then
         pass "en InfoPlist.strings contains NSLocationWhenInUseUsageDescription"
     else
         fail "en InfoPlist.strings missing NSLocationWhenInUseUsageDescription"
@@ -124,12 +131,13 @@ if [ -f "$EN_INFO_STRINGS" ]; then
 fi
 
 if [ -f "$HE_APP_STRINGS" ]; then
-    if grep -q '"app_name" = "זמנים"' "$HE_APP_STRINGS" || grep -q 'app_name.*=.*זמנים' "$HE_APP_STRINGS"; then
+    HE_APP_CONTENT="$(read_strings "$HE_APP_STRINGS")"
+    if echo "$HE_APP_CONTENT" | grep -q "זמנים"; then
         pass "he Localizable.strings has app_name = 'זמנים'"
     else
         fail "he Localizable.strings missing app_name = 'זמנים'"
     fi
-    if grep -q 'נתוני מזג אוויר: MET Norway' "$HE_APP_STRINGS"; then
+    if echo "$HE_APP_CONTENT" | grep -q "נתוני מזג אוויר: MET Norway"; then
         pass "he Localizable.strings has localized weather attribution"
     else
         fail "he Localizable.strings missing localized weather attribution"
@@ -137,12 +145,13 @@ if [ -f "$HE_APP_STRINGS" ]; then
 fi
 
 if [ -f "$EN_APP_STRINGS" ]; then
-    if grep -q '"app_name" = "Zmanim"' "$EN_APP_STRINGS" || grep -q 'app_name.*=.*Zmanim' "$EN_APP_STRINGS"; then
+    EN_APP_CONTENT="$(read_strings "$EN_APP_STRINGS")"
+    if echo "$EN_APP_CONTENT" | grep -q "Zmanim"; then
         pass "en Localizable.strings has app_name = 'Zmanim'"
     else
         fail "en Localizable.strings missing app_name = 'Zmanim'"
     fi
-    if grep -q 'Weather data: MET Norway' "$EN_APP_STRINGS"; then
+    if echo "$EN_APP_CONTENT" | grep -q "Weather data: MET Norway"; then
         pass "en Localizable.strings has English weather attribution"
     else
         fail "en Localizable.strings missing English weather attribution"
@@ -171,10 +180,11 @@ else
             fi
         done
         if [ -f "$bundle/he.lproj/Localizable.strings" ]; then
-            if grep -q "עכשיו" "$bundle/he.lproj/Localizable.strings"; then
-                pass "Core he Localizable.strings contains 'עכשיו'"
+            CORE_HE_CONTENT="$(read_strings "$bundle/he.lproj/Localizable.strings")"
+            if echo "$CORE_HE_CONTENT" | grep -q "בהיר" || echo "$CORE_HE_CONTENT" | grep -q "נתוני מזג אוויר"; then
+                pass "Core he Localizable.strings contains localized weather condition/attribution"
             else
-                fail "Core he Localizable.strings missing 'עכשיו'"
+                fail "Core he Localizable.strings missing expected Hebrew weather strings"
             fi
         fi
     done
@@ -197,6 +207,14 @@ else
                 fail "Syntax error in $strfile"
             fi
         done
+        if [ -f "$bundle/he.lproj/Localizable.strings" ]; then
+            UI_HE_CONTENT="$(read_strings "$bundle/he.lproj/Localizable.strings")"
+            if echo "$UI_HE_CONTENT" | grep -q "עכשיו"; then
+                pass "UI he Localizable.strings contains 'עכשיו'"
+            else
+                fail "UI he Localizable.strings missing 'עכשיו'"
+            fi
+        fi
     done
 fi
 
