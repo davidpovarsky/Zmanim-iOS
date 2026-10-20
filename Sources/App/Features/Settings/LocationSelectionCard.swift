@@ -1,13 +1,13 @@
 import SwiftUI
 
-public struct LocationSelectionCard: View {
-    @ObservedObject public var model: AppModel
+struct LocationSelectionCard: View {
+    @ObservedObject var model: AppModel
 
     @State private var isAddCitySheetPresented: Bool = false
     @State private var cityToDelete: SavedCity? = nil
     @State private var isConfirmingDelete: Bool = false
 
-    public init(model: AppModel) {
+    init(model: AppModel) {
         self.model = model
     }
 

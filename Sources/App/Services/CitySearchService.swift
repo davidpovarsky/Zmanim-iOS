@@ -98,7 +98,7 @@ public final class CitySearchService: NSObject, ObservableObject, MKLocalSearchC
 
     // MARK: - MKLocalSearchCompleterDelegate
 
-    public func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+    nonisolated public func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
         var results: [CitySearchSuggestion] = []
         var completionMap: [String: MKLocalSearchCompletion] = [:]
 
@@ -108,15 +108,19 @@ public final class CitySearchService: NSObject, ObservableObject, MKLocalSearchC
             completionMap[suggestion.id] = completion
         }
 
-        self.rawCompletions = completionMap
-        self.suggestions = results
-        self.isSearching = false
-        self.errorMessage = results.isEmpty ? NSLocalizedString("search.no_results", value: "לא נמצאו תוצאות.", comment: "") : nil
+        Task { @MainActor in
+            self.rawCompletions = completionMap
+            self.suggestions = results
+            self.isSearching = false
+            self.errorMessage = results.isEmpty ? NSLocalizedString("search.no_results", value: "לא נמצאו תוצאות.", comment: "") : nil
+        }
     }
 
-    public func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        self.isSearching = false
-        self.errorMessage = error.localizedDescription
+    nonisolated public func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        Task { @MainActor in
+            self.isSearching = false
+            self.errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - Resolve selected completion to verified location with coordinates & timezone

@@ -41,22 +41,28 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         start()
     }
 
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        authorizationStatus = manager.authorizationStatus
-        if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
-            manager.requestLocation()
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            self.authorizationStatus = manager.authorizationStatus
+            if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
+                manager.requestLocation()
+            }
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let newest = locations.last else { return }
-        location = newest
-        errorMessage = nil
-        onLocation?(newest)
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in
+            guard let newest = locations.last else { return }
+            self.location = newest
+            self.errorMessage = nil
+            self.onLocation?(newest)
+        }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        errorMessage = NSLocalizedString("location.geocode_failed", value: "לא הצלחנו לקבל את המיקום הנוכחי.", comment: "")
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            self.errorMessage = NSLocalizedString("location.geocode_failed", value: "לא הצלחנו לקבל את המיקום הנוכחי.", comment: "")
+        }
     }
 
     func describe(_ location: CLLocation) async -> (city: String, timeZone: TimeZone) {

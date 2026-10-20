@@ -5,24 +5,24 @@ import UIKit
 import WidgetKit
 
 @MainActor
-final class AppModel: ObservableObject {
-    @Published var cityName = NSLocalizedString("location.locating", value: "מאתר מיקום…", comment: "")
-    @Published var timeZone = TimeZone.current
-    @Published var todayItems: [ZmanItem] = []
-    @Published var allItems: [ZmanItem] = []
-    @Published var settings = AppGroupStore.loadSettings()
-    @Published var locationPreferences = LocationPreferencesStore.loadPreferences()
-    @Published var activeChoice: LocationChoice = .current
-    @Published var isGPSActive: Bool = true
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var weatherModel = WeatherSceneModel()
+public final class AppModel: ObservableObject {
+    @Published public var cityName = NSLocalizedString("location.locating", value: "מאתר מיקום…", comment: "")
+    @Published public var timeZone = TimeZone.current
+    @Published public var todayItems: [ZmanItem] = []
+    @Published public var allItems: [ZmanItem] = []
+    @Published public var settings = AppGroupStore.loadSettings()
+    @Published public var locationPreferences = LocationPreferencesStore.loadPreferences()
+    @Published public var activeChoice: LocationChoice = .current
+    @Published public var isGPSActive: Bool = true
+    @Published public var isLoading = false
+    @Published public var errorMessage: String?
+    @Published public var weatherModel = WeatherSceneModel()
 
     let locationService = LocationService()
     private var currentLocation: CLLocation?
     private var loadGeneration: Int = 0
 
-    init() {
+    public init() {
         let prefs = LocationPreferencesStore.loadPreferences()
         locationPreferences = prefs
         activeChoice = prefs.defaultChoice
