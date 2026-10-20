@@ -75,18 +75,13 @@ public enum LocationMode: String, Codable, CaseIterable, Identifiable, Sendable 
     public var id: String { rawValue }
 
     public func localizedTitle(locale: Locale = .autoupdatingCurrent) -> String {
-        let lang = locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")
-        let key: String
+        let isEnglish = (locale.language.languageCode?.identifier ?? (locale.identifier.hasPrefix("en") ? "en" : "he")) == "en"
         switch self {
         case .current:
-            key = "location.current"
+            return isEnglish ? "Current Location" : "המיקום הנוכחי"
         case .fixed:
-            key = "location.fixed"
+            return isEnglish ? "Fixed City" : "עיר קבועה"
         }
-        if let langBundle = LocalizationBundleHelper.bundle(forLanguage: lang) {
-            return NSLocalizedString(key, bundle: langBundle, comment: "")
-        }
-        return NSLocalizedString(key, comment: "")
     }
 
     public var title: String {
