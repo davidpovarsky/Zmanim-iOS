@@ -74,19 +74,21 @@ final class ZmanimUITests: XCTestCase {
     private func expandBanner(_ banner: XCUIElement, springboard: XCUIApplication) {
         Thread.sleep(forTimeInterval: 1.0)
 
-        // Use coordinate-based drag first to prevent AXScrollToVisible failure while banner animates on screen
+        // 1. Long press on the banner (standard iOS gesture to expand into rich notification extension)
         if banner.exists {
-            let startCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            let finishCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 3.0))
-            startCoord.press(forDuration: 0.2, thenDragTo: finishCoord)
-            Thread.sleep(forTimeInterval: 1.5)
-        }
-
-        if findSnoozeButton(in: springboard) == nil && banner.exists {
             banner.press(forDuration: 1.5)
             Thread.sleep(forTimeInterval: 1.5)
         }
 
+        // 2. Fallback gentle drag if not expanded yet
+        if findSnoozeButton(in: springboard) == nil && banner.exists {
+            let startCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+            let finishCoord = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.2))
+            startCoord.press(forDuration: 0.2, thenDragTo: finishCoord)
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+
+        // 3. Fallback swipeDown
         if findSnoozeButton(in: springboard) == nil && banner.exists {
             banner.swipeDown()
             Thread.sleep(forTimeInterval: 1.5)
@@ -149,6 +151,11 @@ final class ZmanimUITests: XCTestCase {
 
         // 5. Tap snooze action while app is open in foreground
         snoozeButton.tap()
+
+        // Give SpringBoard time to dismiss overlay; if foreground focus wasn't restored automatically, activate app
+        if !app.wait(for: .runningForeground, timeout: 3) && app.state != .notRunning {
+            app.activate()
+        }
 
         // 6. Mandatory assertion: Containing app MUST NOT crash
         XCTAssertTrue(
