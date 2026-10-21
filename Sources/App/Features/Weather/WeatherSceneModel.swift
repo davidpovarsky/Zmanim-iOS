@@ -245,22 +245,103 @@ public final class WeatherSceneModel: ObservableObject {
         self.condition = preview.condition
         self.cloudCover = preview.cloudCover
         self.lastUpdated = now
-        self.weatherDisplay = WeatherDisplay(
+
+        let mockHours: [WeatherHour] = (0..<25).map { i in
+            let hourDate = now.addingTimeInterval(Double(i * 3600))
+            return WeatherHour(
+                time: hourDate,
+                temperatureCelsius: 18.0 + Double(i % 5),
+                windMetersPerSecond: 3.5,
+                precipitationChancePercent: preview == .rain ? 80.0 : (preview == .snow ? 70.0 : 0.0),
+                cloudAreaFractionPercent: preview.cloudCover * 100.0,
+                symbolCode: preview.symbolCode,
+                iconKey: preview.iconKey
+            )
+        }
+
+        let mockSnapshot = WeatherSnapshot(
+            hours: mockHours,
+            retrievedAt: now,
+            locationLatitude: 31.778,
+            locationLongitude: 35.235,
+            expiresAt: now.addingTimeInterval(1800)
+        )
+
+        self.currentSnapshot = mockSnapshot
+        self.weatherDisplay = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
+            from: mockSnapshot,
             cityName: cityName,
             timeZone: timeZone,
-            buttonTitle: "22°",
-            header: WeatherDisplay.Header(
-                iconName: "sun.max.fill",
-                temperature: "22°",
-                conditionSummary: "בהיר"
-            ),
-            stats: [
-                WeatherDisplay.Stat(label: "משקעים", value: "0%"),
-                WeatherDisplay.Stat(label: "רוח", value: "3 קמ״ש"),
-                WeatherDisplay.Stat(label: "עננות", value: "\(Int(preview.cloudCover * 100))%")
-            ],
-            hourly: []
+            now: now
         )
     }
     #endif
 }
+
+#if DEBUG
+public enum WeatherScenePreview: String, CaseIterable, Identifiable {
+    case clearMorning = "בוקר בהיר"
+    case middaySun = "צהריים שטופי שמש"
+    case partlyCloudyAfternoon = "אחר הצהריים מעונן חלקית"
+    case overcastAfternoon = "אחר הצהריים מעונן"
+    case goldenSunset = "שקיעה זהובה"
+    case twilight = "דמדומים"
+    case clearNight = "לילה בהיר זרוע כוכבים"
+    case rain = "גשם"
+    case snow = "שלג"
+    case fog = "ערפל"
+
+    public var id: String { rawValue }
+
+    public var condition: WeatherCondition {
+        switch self {
+        case .clearMorning, .middaySun: return .clearDay
+        case .partlyCloudyAfternoon: return .partlyCloudyDay
+        case .overcastAfternoon: return .overcastDay
+        case .goldenSunset: return .sunset
+        case .twilight: return .sunrise
+        case .clearNight: return .clearNight
+        case .rain: return .rain
+        case .snow: return .snow
+        case .fog: return .fog
+        }
+    }
+
+    public var cloudCover: Double {
+        switch self {
+        case .clearMorning, .middaySun, .clearNight: return 0.0
+        case .partlyCloudyAfternoon: return 0.45
+        case .overcastAfternoon: return 0.85
+        case .goldenSunset, .twilight: return 0.15
+        case .rain: return 0.90
+        case .snow: return 0.80
+        case .fog: return 0.70
+        }
+    }
+
+    public var symbolCode: String {
+        switch self {
+        case .clearMorning, .middaySun: return "clearsky_day"
+        case .partlyCloudyAfternoon: return "partlycloudy_day"
+        case .overcastAfternoon: return "cloudy"
+        case .goldenSunset, .twilight: return "clearsky_day"
+        case .clearNight: return "clearsky_night"
+        case .rain: return "rain"
+        case .snow: return "snow"
+        case .fog: return "fog"
+        }
+    }
+
+    public var iconKey: String {
+        switch self {
+        case .clearMorning, .middaySun, .goldenSunset, .twilight: return "clear-day"
+        case .partlyCloudyAfternoon: return "partly-cloudy-day"
+        case .overcastAfternoon: return "cloudy"
+        case .clearNight: return "clear-night"
+        case .rain: return "rain"
+        case .snow: return "snow"
+        case .fog: return "fog"
+        }
+    }
+}
+#endif
