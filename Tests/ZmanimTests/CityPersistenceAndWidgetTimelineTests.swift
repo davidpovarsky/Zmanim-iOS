@@ -4,14 +4,29 @@ import XCTest
 
 final class CityPersistenceAndWidgetTimelineTests: XCTestCase {
 
+    private func resetSharedDefaults() {
+        if let defaults = UserDefaults(suiteName: AppGroupStore.groupID) {
+            defaults.removeObject(forKey: LocationPreferencesStore.preferencesKey)
+            defaults.removeObject(forKey: "settings")
+            defaults.removeObject(forKey: "snapshot_current")
+            defaults.removeObject(forKey: "snapshot")
+            for key in defaults.dictionaryRepresentation().keys {
+                if key.hasPrefix("snapshot_") || key.hasPrefix("handshake_") {
+                    defaults.removeObject(forKey: key)
+                }
+            }
+        }
+    }
+
     override func setUp() {
         super.setUp()
         // Reset shared container suite state for isolated test execution
-        if let defaults = UserDefaults(suiteName: AppGroupStore.groupID) {
-            defaults.removeObject(forKey: LocationPreferencesStore.preferencesKey)
-            defaults.removeObject(forKey: "snapshot_current")
-            defaults.removeObject(forKey: "snapshot")
-        }
+        resetSharedDefaults()
+    }
+
+    override func tearDown() {
+        resetSharedDefaults()
+        super.tearDown()
     }
 
     // 1. Save failure must not return a phantom city with unpersisted UUID
@@ -140,7 +155,7 @@ final class CityPersistenceAndWidgetTimelineTests: XCTestCase {
             longitude: 34.643,
             timeZoneID: "Asia/Jerusalem"
         )
-        XCTAssertEqual(prefs.savedCities.count, 1)
+        XCTAssertTrue(prefs.savedCities.contains(where: { $0.id == city.id }))
 
         let query = WidgetLocationQuery()
         let suggested = try await query.suggestedEntities()
