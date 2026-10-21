@@ -80,7 +80,7 @@ final class CityPersistenceAndWidgetTimelineTests: XCTestCase {
         let item = ZmanItem(key: "sunset", hebrewTitle: "שקיעה", englishTitle: "Sunset", icon: "sunset.fill", date: now.addingTimeInterval(3600))
         let pager = UpcomingZmanPager(allItems: [item], referenceDate: now, timeZone: city.timeZone)
         XCTAssertEqual(pager.pageCount, 1)
-        XCTAssertEqual(pager.itemsForPage(0).count, 1)
+        XCTAssertEqual(pager.items(for: 0).count, 1)
     }
 
     // 4. Snapshot and timeline use strictly identical city identity (no cross-city fallback)
