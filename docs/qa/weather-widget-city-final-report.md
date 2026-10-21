@@ -106,3 +106,44 @@ Following real hardware testing on iPad with SideStore, two P0 blockers were ide
 | **DEV-14** | RTL Hebrew / LTR English | Automated | **PASS** | Verified 121 localized keys matching across `he` and `en` catalogs. |
 | **DEV-15** | SideStore App Group handshake | Device Verification | **READY FOR DEVICE** | `AppGroupDiagnostics` records app write -> widget ACK -> app verify. |
 | **DEV-16** | Shabbat/Holiday alerts, Snooze, Split View | Automated | **PASS** | Zero regressions across notification extensions and windowing rules. |
+
+---
+
+## 5. CI & Build Verification Summary
+
+| Item | Details |
+|---|---|
+| **Head Commit** | [`d6f6067`](https://github.com/davidpovarsky/Zmanim-iOS/commit/d6f606780f8026d18ae5f50ad2f8eb970e305a79) — `fix(tests): isolate AppGroup test suite and verify entity query resolution` |
+| **GitHub Actions Run** | [Run #39603468236](https://github.com/davidpovarsky/Zmanim-iOS/actions/runs/39603468236) — **SUCCESS (All Jobs Green)** |
+| **Pull Request** | [PR #1](https://github.com/davidpovarsky/Zmanim-iOS/pull/1) — Open (retained for review) |
+| **Job 1: `simulator-validation`** | **10m 38s — PASS** (131/131 tests passed, 0 failures; runtime simulator validation & diagnostics captured) |
+| **Job 2: `unsigned-ipa`** | **2m 55s — PASS** (Release device build, verified extensions, packaged `Zmanim-unsigned.ipa`) |
+| **Artifact: `Zmanim-unsigned-IPA`** | Size: 1,420,681 bytes (1.42 MB)  <br> Digest: `sha256:7b5cee9979c33d6a9ae0a9a1c0442f4d60238821a40cb61df48dcfb00b6dfb55` |
+| **Artifact: `simulator-validation-diagnostics`** | Size: 15,478,838 bytes (15.48 MB)  <br> Digest: `sha256:afce438142ce8f3569174374bd12d28f8af7824ec82b3abe7dbcff4529070cf8` |
+
+---
+
+## 6. On-Device Verification Guide (iPad & SideStore)
+
+### Step 1: Install Update via SideStore
+1. Download `Zmanim-unsigned-IPA` from GitHub Actions Run [#39603468236](https://github.com/davidpovarsky/Zmanim-iOS/actions/runs/39603468236).
+2. Open SideStore on the iPad, select the IPA, and re-sign/install over the existing installation.
+3. Verify existing saved cities remain intact (deterministic migration preserves IDs without resetting).
+
+### Step 2: Verify P0-WEATHER (Automatic Weather Refresh)
+1. Launch Zmanim on iPad in landscape or portrait.
+2. Open the location picker (`HomeLocationMenu`) and switch to a different saved city (e.g., from Jerusalem to London, or from London to Tel Aviv).
+3. **Observation:**
+   - Weather condition icon and temperature in the top bar update automatically once MET Norway responds.
+   - The solar hero and dynamic `SwiftUISky` background adjust immediately to the target city's sun position and sky state.
+   - **No tap on the manual refresh button is required.**
+4. Tap the weather button to open `WeatherDetailPopup`: verify the city name, forecast hours, and stats correspond exactly to the selected city.
+
+### Step 3: Verify P0-WIDGET-CITY (Widget Saved City Selection)
+1. Add a Zmanim Medium/Large widget to the iPad Home Screen or Today View.
+2. Long-press the widget and tap **Edit Widget** (ערוך וידג'ט).
+3. In the Location field, select a specific saved city (e.g. "Ashdod" or "Safed").
+4. **Observation:**
+   - The widget displays the authentic zmanim for the selected city with the city name clearly identified.
+   - It **never** displays "No zmanim data available" or an unconfigured recovery state.
+5. Add a second widget configured for a different city: verify both widgets render simultaneously with independent calculations and timezones.
