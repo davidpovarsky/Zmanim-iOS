@@ -57,7 +57,7 @@ final class WeatherObservationTests: XCTestCase {
         XCTAssertTrue(objectWillChangeEmitted, "WeatherSceneModel must fire objectWillChange to notify SwiftUI observers")
         XCTAssertTrue(weatherModel.isAvailable)
         XCTAssertNotNil(weatherModel.weatherDisplay)
-        XCTAssertEqual(weatherModel.weatherDisplay?.cityName, "Jerusalem")
+        XCTAssertEqual(weatherModel.weatherDisplay?.header.regionName, "Jerusalem")
     }
 
     @MainActor
@@ -101,7 +101,7 @@ final class WeatherObservationTests: XCTestCase {
         weatherModel.resetForLocationChange()
         let displayB = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(from: snapB, cityName: "London", timeZone: .current, now: now)
         XCTAssertNotNil(displayB)
-        XCTAssertEqual(displayB?.cityName, "London")
+        XCTAssertEqual(displayB?.header.regionName, "London")
     }
 
     @MainActor
