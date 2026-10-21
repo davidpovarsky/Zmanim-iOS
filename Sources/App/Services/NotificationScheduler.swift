@@ -11,12 +11,12 @@ enum NotificationScheduler {
     static func configureCategories() {
         let snooze = UNNotificationAction(
             identifier: snoozeActionID,
-            title: "נודניק 5 דק׳",
+            title: NSLocalizedString("notification.snooze_5_min", comment: ""),
             options: []
         )
         let open = UNNotificationAction(
             identifier: openActionID,
-            title: "פתח זמני היום",
+            title: NSLocalizedString("notification.open_zmanim", comment: ""),
             options: [.foreground]
         )
         let category = UNNotificationCategory(
@@ -41,15 +41,17 @@ enum NotificationScheduler {
     static func schedule(settings: UserSettings, items: [ZmanItem], timeZone: TimeZone) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
-        // Only remove ordinary daily scheduled notifications. Do NOT remove active snoozes or tests.
-        let toRemove = pending.map(\.identifier).filter { $0.hasPrefix("zmanim.daily.") }
+        // Only remove ordinary daily and special scheduled notifications. Do NOT remove active snoozes or tests.
+        let toRemove = pending.map(\.identifier).filter { $0.hasPrefix("zmanim.daily.") || $0.hasPrefix("zmanim.special.") }
         center.removePendingNotificationRequests(withIdentifiers: toRemove)
+
+        let now = Date()
 
         var candidates: [(Date, NotificationRule, ZmanItem)] = []
         for rule in settings.rules where rule.isEnabled {
             for item in items where item.key == rule.zmanKey {
                 let fire = item.date.addingTimeInterval(TimeInterval(rule.offsetMinutes * 60))
-                if fire > Date().addingTimeInterval(2) {
+                if fire > now.addingTimeInterval(2) {
                     candidates.append((fire, rule, item))
                 }
             }
@@ -58,6 +60,10 @@ enum NotificationScheduler {
         candidates.sort { $0.0 < $1.0 }
         for (index, candidate) in candidates.prefix(60).enumerated() {
             let (fire, rule, item) = candidate
+            let sunrise = ZmanDayResolver.sunrise(from: items, date: item.date, timeZone: timeZone)
+            let sunset = ZmanDayResolver.sunset(from: items, date: item.date, timeZone: timeZone)
+            let progress = SolarArcGeometry.progress(now: item.date, sunrise: sunrise, sunset: sunset)
+
             let content = UNMutableNotificationContent()
             content.title = rule.displayTitle
             content.body = body(rule: rule, item: item, timeZone: timeZone)
@@ -66,7 +72,10 @@ enum NotificationScheduler {
             content.userInfo = [
                 "zmanTitle": rule.displayTitle,
                 "zmanTime": item.date.timeIntervalSince1970,
-                "zmanIcon": item.icon
+                "zmanIcon": item.icon,
+                "zmanProgress": progress,
+                "sunriseTime": sunrise?.timeIntervalSince1970 ?? 0,
+                "sunsetTime": sunset?.timeIntervalSince1970 ?? 0
             ]
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, fire.timeIntervalSinceNow), repeats: false)
             try? await center.add(UNNotificationRequest(
@@ -75,16 +84,46 @@ enum NotificationScheduler {
                 trigger: trigger
             ))
         }
+
+        // Schedule verified Shabbat and holiday notifications
+        let specialNotifications = SpecialDayNotificationPlanner.plan(
+            settings: settings,
+            items: items,
+            timeZone: timeZone,
+            now: now
+        )
+
+        for special in specialNotifications {
+            let content = UNMutableNotificationContent()
+            content.title = special.title
+            content.body = special.body
+            content.sound = .default
+            content.categoryIdentifier = categoryID
+            content.userInfo = [
+                "zmanTitle": special.title,
+                "zmanTime": special.fireDate.timeIntervalSince1970,
+                "zmanIcon": special.icon
+            ]
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, special.fireDate.timeIntervalSinceNow),
+                repeats: false
+            )
+            try? await center.add(UNNotificationRequest(
+                identifier: special.id,
+                content: content,
+                trigger: trigger
+            ))
+        }
     }
 
     static func sendTestNotification() async {
         let content = UNMutableNotificationContent()
-        content.title = "שקיעה בעוד 15 דקות"
-        content.body = "שקיעה היום בשעה 18:21"
+        content.title = NSLocalizedString("notification.test_title", comment: "")
+        content.body = NSLocalizedString("notification.test_body", comment: "")
         content.sound = .default
         content.categoryIdentifier = categoryID
         content.userInfo = [
-            "zmanTitle": "שקיעה",
+            "zmanTitle": NSLocalizedString("sunset", comment: ""),
             "zmanTime": Date().addingTimeInterval(900).timeIntervalSince1970,
             "zmanIcon": "sunset.fill"
         ]
@@ -99,8 +138,13 @@ enum NotificationScheduler {
         let formatter = DateFormatter()
         formatter.timeZone = timeZone
         formatter.dateFormat = "HH:mm"
-        if rule.offsetMinutes == 0 { return "הזמן הגיע · \(formatter.string(from: item.date))" }
-        return "\(abs(rule.offsetMinutes)) דקות \(rule.offsetMinutes < 0 ? "לפני" : "אחרי") · \(formatter.string(from: item.date))"
+        if rule.offsetMinutes == 0 {
+            return String(format: NSLocalizedString("notification.time_arrived_time", comment: ""), formatter.string(from: item.date))
+        } else if rule.offsetMinutes < 0 {
+            return String(format: NSLocalizedString("notification.minutes_before_format", comment: ""), abs(rule.offsetMinutes), formatter.string(from: item.date))
+        } else {
+            return String(format: NSLocalizedString("notification.minutes_after_format", comment: ""), abs(rule.offsetMinutes), formatter.string(from: item.date))
+        }
     }
 }
 
@@ -140,7 +184,14 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
 
         switch actionID {
         case NotificationSchedulerConstants.snoozeActionID:
-            let bgTask = UIApplication.shared.beginBackgroundTask(withName: "scheduleSnooze") { }
+            var bgTask: UIBackgroundTaskIdentifier = .invalid
+            bgTask = UIApplication.shared.beginBackgroundTask(withName: "scheduleSnooze") {
+                if bgTask != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                    bgTask = .invalid
+                }
+            }
+
             let request = ZmanimSnoozeRequest.make(
                 from: response.notification.request.content,
                 originalIdentifier: originalID
@@ -153,18 +204,25 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
                     Self.logger.notice("NotificationCoordinator scheduled snooze: \(request.identifier, privacy: .public)")
                 }
                 #endif
-                completionHandler()
-                if bgTask != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTask)
+                DispatchQueue.main.async {
+                    completionHandler()
+                    if bgTask != .invalid {
+                        UIApplication.shared.endBackgroundTask(bgTask)
+                        bgTask = .invalid
+                    }
                 }
             }
         case NotificationSchedulerConstants.openActionID:
             #if DEBUG
             Self.logger.notice("NotificationCoordinator openAction selected")
             #endif
-            completionHandler()
+            DispatchQueue.main.async {
+                completionHandler()
+            }
         default:
-            completionHandler()
+            DispatchQueue.main.async {
+                completionHandler()
+            }
         }
     }
 }

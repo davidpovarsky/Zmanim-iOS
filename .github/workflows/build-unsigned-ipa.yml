@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/runtime-widget-notification-validation
+      - feature/met-weather-widget-paging-eod
   workflow_dispatch:
 
 permissions:
@@ -13,7 +14,7 @@ permissions:
 
 jobs:
   simulator-validation:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - name: Live Activity · refresh
@@ -25,6 +26,25 @@ jobs:
           token: ${{ secrets.NOTIFY_DEVICE_TOKEN }}
           github_token: ${{ github.token }}
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6 and verify iOS SDK
+        run: |
+          set -euo pipefail
+          if [ -d "/Applications/Xcode_26.6.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          elif [ -d "/Applications/Xcode.app" ]; then
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          echo "Active Developer Directory: $(xcode-select -p)"
+          xcodebuild -version
+          SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iPhoneOS SDK version: $SDK_VERSION"
+          MAJOR_SDK="$(echo "$SDK_VERSION" | cut -d. -f1)"
+          if [ "$MAJOR_SDK" -lt 26 ]; then
+            echo "Error: iOS SDK version is $SDK_VERSION (less than 26)" >&2
+            exit 1
+          fi
+          xcrun simctl list runtimes
 
       - name: Live Activity · refresh
         uses: davidpovarsky/github-automation/live-refresh@main
@@ -60,9 +80,15 @@ jobs:
         run: |
           set -euo pipefail
           xcrun simctl list runtimes
-          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone 16 \(/ {print $2; exit}')"
+          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone 17 \(/ {print $2; exit}')"
+          if [ -z "$DEVICE_ID" ]; then
+            DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone 16 \(/ {print $2; exit}')"
+          fi
           if [ -z "$DEVICE_ID" ]; then
             DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone 15 \(/ {print $2; exit}')"
+          fi
+          if [ -z "$DEVICE_ID" ]; then
+            DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone \(/ {print $2; exit}')"
           fi
           test -n "$DEVICE_ID"
           echo "DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
@@ -104,6 +130,11 @@ jobs:
           device_id: ${{ secrets.NOTIFY_DEVICE_ID }}
           token: ${{ secrets.NOTIFY_DEVICE_TOKEN }}
           github_token: ${{ github.token }}
+      - name: Verify localization completeness
+        run: |
+          chmod +x scripts/verify-localization-completeness.sh
+          bash scripts/verify-localization-completeness.sh
+
       - name: Validate simulator product structure and Info.plists
         run: |
           set -euo pipefail
@@ -126,6 +157,15 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$WIDGET_PATH/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NOTIFICATION_PATH/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDevelopmentRegion' "$APP_PATH/Info.plist" | grep -Fx 'he'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP_PATH/Info.plist" | grep -F 'he'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$APP_PATH/Info.plist" | grep -F 'en'
+          test -d "$APP_PATH/he.lproj"
+          test -d "$APP_PATH/en.lproj"
+          test -f "$APP_PATH/he.lproj/Localizable.strings"
+          test -f "$APP_PATH/en.lproj/Localizable.strings"
+          test -f "$APP_PATH/he.lproj/InfoPlist.strings"
+          test -f "$APP_PATH/en.lproj/InfoPlist.strings"
 
       - name: Live Activity · refresh
         uses: davidpovarsky/github-automation/live-refresh@main
@@ -163,7 +203,7 @@ jobs:
 
   unsigned-ipa:
     needs: simulator-validation
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 35
     steps:
       - name: Live Activity · refresh
@@ -175,6 +215,25 @@ jobs:
           token: ${{ secrets.NOTIFY_DEVICE_TOKEN }}
           github_token: ${{ github.token }}
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6 and verify iOS SDK
+        run: |
+          set -euo pipefail
+          if [ -d "/Applications/Xcode_26.6.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          elif [ -d "/Applications/Xcode.app" ]; then
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          echo "Active Developer Directory: $(xcode-select -p)"
+          xcodebuild -version
+          SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iPhoneOS SDK version: $SDK_VERSION"
+          MAJOR_SDK="$(echo "$SDK_VERSION" | cut -d. -f1)"
+          if [ "$MAJOR_SDK" -lt 26 ]; then
+            echo "Error: iOS SDK version is $SDK_VERSION (less than 26)" >&2
+            exit 1
+          fi
+          xcrun simctl list runtimes
 
       - name: Live Activity · refresh
         uses: davidpovarsky/github-automation/live-refresh@main
@@ -241,8 +300,11 @@ jobs:
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qry Zmanim-unsigned.ipa Payload
-          chmod +x scripts/verify-ipa-extensions.sh
+          chmod +x scripts/verify-localization-completeness.sh scripts/verify-ipa-extensions.sh scripts/verify-ipa-localizations.sh scripts/verify-ipa-windowing.sh
+          bash scripts/verify-localization-completeness.sh
+          bash scripts/verify-ipa-windowing.sh Zmanim-unsigned.ipa
           bash scripts/verify-ipa-extensions.sh Zmanim-unsigned.ipa
+          bash scripts/verify-ipa-localizations.sh Zmanim-unsigned.ipa
 
       - name: Live Activity · refresh
         uses: davidpovarsky/github-automation/live-refresh@main

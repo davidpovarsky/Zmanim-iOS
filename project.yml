@@ -1,6 +1,7 @@
 name: Zmanim
 options:
   bundleIdPrefix: com.davidpovarsky
+  developmentLanguage: he
   deploymentTarget:
     iOS: "17.0"
 settings:
@@ -9,9 +10,12 @@ settings:
     TARGETED_DEVICE_FAMILY: "1,2"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "4"
+    DEVELOPMENT_LANGUAGE: he
 packages:
   SwiftUISky:
     path: Packages/SwiftUISky
+  OneBusAwayWeather:
+    path: Packages/OneBusAwayWeather
 targets:
   Zmanim:
     type: application
@@ -19,23 +23,41 @@ targets:
     sources:
       - Sources/App
       - Sources/Shared
-    resources:
-      - Resources
+      - path: Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim
+        DEVELOPMENT_LANGUAGE: he
         CODE_SIGN_ENTITLEMENTS: Supporting/Zmanim.entitlements
     info:
       path: Supporting/Zmanim-Info.plist
       properties:
+        CFBundleDevelopmentRegion: he
+        CFBundleLocalizations:
+          - he
+          - en
         CFBundleDisplayName: Zmanim
         CFBundleName: Zmanim
         UILaunchScreen: {}
         NSLocationWhenInUseUsageDescription: "המיקום משמש לחישוב זמני היום המדויקים באזור שלך."
         NSSupportsLiveActivities: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     dependencies:
       - package: SwiftUISky
         product: SwiftUISky
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherCore
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherUI
       - target: ZmanimWidgets
         embed: true
       - target: ZmanimNotificationContent
@@ -46,16 +68,21 @@ targets:
     sources:
       - Sources/Widgets
       - Sources/Shared
-    resources:
-      - Resources
+      - path: Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.Widgets
+        DEVELOPMENT_LANGUAGE: he
         APPLICATION_EXTENSION_API_ONLY: YES
         CODE_SIGN_ENTITLEMENTS: Supporting/ZmanimWidgets.entitlements
     info:
       path: Supporting/ZmanimWidgets-Info.plist
       properties:
+        CFBundleDevelopmentRegion: he
+        CFBundleLocalizations:
+          - he
+          - en
         CFBundleDisplayName: Zmanim Widgets
         NSWidgetWantsLocation: true
         NSExtension:
@@ -67,6 +94,9 @@ targets:
       - Sources/NotificationContent
       - Sources/Shared/SnoozeRequest.swift
       - Sources/Shared/SolarArcGeometry.swift
+      - Sources/Shared/SolarPhase.swift
+      - path: Resources
+        buildPhase: resources
     resources:
       - Sources/NotificationContent/MainInterface.storyboard
     dependencies:
@@ -75,11 +105,16 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.NotificationContent
+        DEVELOPMENT_LANGUAGE: he
         APPLICATION_EXTENSION_API_ONLY: YES
         OTHER_LDFLAGS: ["$(inherited)", "-framework", "UserNotificationsUI", "-framework", "UserNotifications"]
     info:
       path: Supporting/ZmanimNotificationContent-Info.plist
       properties:
+        CFBundleDevelopmentRegion: he
+        CFBundleLocalizations:
+          - he
+          - en
         CFBundleDisplayName: Zmanim Alert
         NSExtension:
           NSExtensionPointIdentifier: com.apple.usernotifications.content-extension
@@ -94,11 +129,18 @@ targets:
     platform: iOS
     sources:
       - Tests/ZmanimTests
+      - path: Resources
+        buildPhase: resources
     dependencies:
       - target: Zmanim
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherCore
+      - package: OneBusAwayWeather
+        product: OneBusAwayWeatherUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.Tests
+        DEVELOPMENT_LANGUAGE: he
   ZmanimUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -110,6 +152,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.UITests
         TEST_TARGET_NAME: Zmanim
+        DEVELOPMENT_LANGUAGE: he
 schemes:
   Zmanim:
     build:

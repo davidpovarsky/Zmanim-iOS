@@ -32,7 +32,6 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         #endif
 
         preferredContentSize = CGSize(width: 390, height: 240)
-        view.semanticContentAttribute = .forceRightToLeft
         view.backgroundColor = UIColor(red: 0.972, green: 0.966, blue: 0.936, alpha: 1)
 
         #if DEBUG
@@ -62,23 +61,23 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         eyebrowLabel.translatesAutoresizingMaskIntoConstraints = false
         eyebrowLabel.font = .preferredFont(forTextStyle: .caption1)
         eyebrowLabel.textColor = .secondaryLabel
-        eyebrowLabel.textAlignment = .right
-        eyebrowLabel.text = "תזכורת זמן"
+        eyebrowLabel.textAlignment = .natural
+        eyebrowLabel.text = NSLocalizedString("notification.time_reminder", comment: "")
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
         titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.textAlignment = .right
+        titleLabel.textAlignment = .natural
         titleLabel.numberOfLines = 1
 
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         timeLabel.font = .monospacedDigitSystemFont(ofSize: 34, weight: .semibold)
-        timeLabel.textAlignment = .right
+        timeLabel.textAlignment = .natural
 
         countdownLabel.translatesAutoresizingMaskIntoConstraints = false
         countdownLabel.font = .preferredFont(forTextStyle: .subheadline)
         countdownLabel.textColor = UIColor.systemOrange
-        countdownLabel.textAlignment = .right
+        countdownLabel.textAlignment = .natural
 
         let textStack = UIStackView(arrangedSubviews: [eyebrowLabel, titleLabel, timeLabel, countdownLabel])
         textStack.translatesAutoresizingMaskIntoConstraints = false
@@ -90,7 +89,6 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         header.axis = .horizontal
         header.alignment = .top
         header.spacing = 14
-        header.semanticContentAttribute = .forceRightToLeft
         card.addSubview(header)
 
         horizonView.translatesAutoresizingMaskIntoConstraints = false
@@ -151,8 +149,9 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         let margin: CGFloat = 12
         let base = bounds.height - 4
         let arcHeight = bounds.height - 10
-        let p0 = CGPoint(x: margin, y: base)
-        let p2 = CGPoint(x: bounds.width - margin, y: base)
+        let isRTL = view.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        let p0 = isRTL ? CGPoint(x: bounds.width - margin, y: base) : CGPoint(x: margin, y: base)
+        let p2 = isRTL ? CGPoint(x: margin, y: base) : CGPoint(x: bounds.width - margin, y: base)
         let p1 = CGPoint(x: bounds.width / 2, y: base - 2 * arcHeight)
 
         let path = UIBezierPath()
@@ -161,11 +160,16 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         arcLayer.path = path.cgPath
         arcLayer.frame = bounds
 
-        let t = CGFloat(currentProgress)
-        let u = 1 - t
-        let sunX = u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x
-        let sunY = u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y
-        sunView.center = CGPoint(x: sunX, y: sunY)
+        if currentProgress >= 0 {
+            sunView.isHidden = false
+            let t = CGFloat(currentProgress)
+            let u = 1 - t
+            let sunX = u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x
+            let sunY = u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y
+            sunView.center = CGPoint(x: sunX, y: sunY)
+        } else {
+            sunView.isHidden = true
+        }
     }
 
     public func didReceive(_ notification: UNNotification) {
@@ -177,7 +181,7 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         #endif
 
         let title = content.userInfo["zmanTitle"] as? String ?? content.title
-        titleLabel.text = title.isEmpty ? "תזכורת זמן" : title
+        titleLabel.text = title.isEmpty ? NSLocalizedString("notification.time_reminder", comment: "") : title
 
         let iconName = content.userInfo["zmanIcon"] as? String ?? "sun.max.fill"
         iconView.image = UIImage(systemName: iconName) ?? UIImage(systemName: "sun.max.fill")
@@ -186,7 +190,7 @@ public final class NotificationViewController: UIViewController, UNNotificationC
             let target = Date(timeIntervalSince1970: seconds)
             targetDate = target
             let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "he_IL")
+            formatter.locale = Locale.autoupdatingCurrent
             formatter.dateFormat = "HH:mm"
             timeLabel.text = formatter.string(from: target)
             updateCountdown()
@@ -201,14 +205,20 @@ public final class NotificationViewController: UIViewController, UNNotificationC
 
         if let progressVal = content.userInfo["zmanProgress"] as? Double {
             currentProgress = max(0, min(1, progressVal))
-        } else if title.contains("שקיעה") {
-            currentProgress = 0.90
-        } else if title.contains("זריחה") {
-            currentProgress = 0.10
-        } else if title.contains("חצות") {
-            currentProgress = 0.50
+        } else if let sunriseTime = content.userInfo["sunriseTime"] as? Double,
+                  let sunsetTime = content.userInfo["sunsetTime"] as? Double,
+                  let target = targetDate,
+                  sunriseTime > 0, sunsetTime > sunriseTime {
+            let rise = Date(timeIntervalSince1970: sunriseTime)
+            let set = Date(timeIntervalSince1970: sunsetTime)
+            let phase = SolarPhase.resolve(now: target, sunrise: rise, sunset: set)
+            if phase.isDaylight {
+                currentProgress = phase.progress
+            } else {
+                currentProgress = -1
+            }
         } else {
-            currentProgress = 0.75
+            currentProgress = -1
         }
 
         view.setNeedsLayout()
@@ -218,11 +228,11 @@ public final class NotificationViewController: UIViewController, UNNotificationC
         guard let targetDate else { return }
         let minutes = Int(ceil(targetDate.timeIntervalSinceNow / 60))
         if minutes > 0 {
-            countdownLabel.text = "בעוד \(minutes) דקות"
+            countdownLabel.text = String(format: NSLocalizedString("notification.in_minutes_format", comment: ""), minutes)
         } else if minutes == 0 {
-            countdownLabel.text = "הזמן הגיע"
+            countdownLabel.text = NSLocalizedString("notification.time_arrived", comment: "")
         } else {
-            countdownLabel.text = "לפני \(abs(minutes)) דקות"
+            countdownLabel.text = String(format: NSLocalizedString("notification.minutes_ago_format", comment: ""), abs(minutes))
         }
     }
 

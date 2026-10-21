@@ -1,0 +1,11 @@
+"common.close" = "Close";
+"weather.condition.clear" = "Clear";
+"weather.condition.cloudy" = "Cloudy";
+"weather.condition.fog" = "Fog";
+"weather.condition.partly_cloudy" = "Partly Cloudy";
+"weather.condition.rain" = "Rain";
+"weather.condition.sleet" = "Sleet";
+"weather.condition.snow" = "Snow";
+"weather.condition.unknown" = "—";
+"weather.condition.wind" = "Windy";
+"weather.source_attribution" = "Weather data: MET Norway (CC BY 4.0)";

@@ -105,13 +105,40 @@ final class SolarArcGeometryTests: XCTestCase {
         // Exactly sunset -> 1.0
         XCTAssertEqual(SolarArcGeometry.progress(now: sunset, sunrise: sunrise, sunset: sunset), 1.0)
 
-        // After sunset -> clamp 1.0
+        // After sunset -> night state: daylight has ended, progress returns 0.0 (no fake 1.0)
         let after = sunset.addingTimeInterval(3600)
-        XCTAssertEqual(SolarArcGeometry.progress(now: after, sunrise: sunrise, sunset: sunset), 1.0)
+        XCTAssertEqual(SolarArcGeometry.progress(now: after, sunrise: sunrise, sunset: sunset), 0.0)
 
         // Missing data or invalid order
         XCTAssertEqual(SolarArcGeometry.progress(now: midday, sunrise: nil, sunset: sunset), 0.0)
         XCTAssertEqual(SolarArcGeometry.progress(now: midday, sunrise: sunrise, sunset: nil), 0.0)
         XCTAssertEqual(SolarArcGeometry.progress(now: midday, sunrise: sunset, sunset: sunrise), 0.0)
+    }
+
+    func testChronologicalProgressionRTLRightToLeft() {
+        let size = CGSize(width: 400, height: 140)
+        let arc = SolarArcGeometry(size: size, margin: 20, base: 100, arcHeight: 60, isRTL: true)
+
+        // Sunrise (t = 0) is on the right
+        let p0 = arc.point(at: 0.0)
+        XCTAssertEqual(p0.x, 400 - 20, accuracy: epsilon)
+        XCTAssertEqual(p0.x, arc.startPoint.x, accuracy: epsilon)
+
+        // Sunset (t = 1) is on the left
+        let p100 = arc.point(at: 1.0)
+        XCTAssertEqual(p100.x, 20, accuracy: epsilon)
+        XCTAssertEqual(p100.x, arc.endPoint.x, accuracy: epsilon)
+
+        // Midday (t = 0.5) apex is centered
+        let p50 = arc.point(at: 0.5)
+        XCTAssertEqual(p50.x, 200, accuracy: epsilon)
+
+        // X strictly decreases as progress increases
+        var prevX: CGFloat = 9999
+        for step in stride(from: 0.0, through: 1.0, by: 0.05) {
+            let pt = arc.point(at: step)
+            XCTAssertLessThan(pt.x, prevX, "In RTL, progress must move strictly right to left")
+            prevX = pt.x
+        }
     }
 }

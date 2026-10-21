@@ -1,0 +1,11 @@
+"common.close" = "סגור";
+"weather.condition.clear" = "בהיר";
+"weather.condition.cloudy" = "מעונן";
+"weather.condition.fog" = "ערפל";
+"weather.condition.partly_cloudy" = "מעונן חלקית";
+"weather.condition.rain" = "גשם";
+"weather.condition.sleet" = "שלג מעורב בגשם";
+"weather.condition.snow" = "שלג";
+"weather.condition.unknown" = "—";
+"weather.condition.wind" = "רוח חזקה";
+"weather.source_attribution" = "נתוני מזג אוויר: MET Norway (CC BY 4.0)";
