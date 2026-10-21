@@ -14,7 +14,10 @@ final class WidgetConfigurationEntityTests: XCTestCase {
         XCTAssertTrue(suggested.count >= 3)
         XCTAssertEqual(suggested[0].id, "app-default")
         XCTAssertEqual(suggested[1].id, "current-gps")
-        XCTAssertEqual(suggested[2].id, "city:c-test-1")
+        // A selected city must contain verified coordinates and timezone,
+        // rather than depend on App Group lookup when WidgetKit runs.
+        XCTAssertEqual(suggested[2].id, WidgetSavedCityPayload.identifier(for: city))
+        XCTAssertEqual(WidgetSavedCityPayload.city(from: suggested[2].id), city)
         XCTAssertEqual(suggested[2].name, "Jerusalem")
     }
 
