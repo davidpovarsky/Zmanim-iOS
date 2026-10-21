@@ -53,24 +53,33 @@ public struct WidgetLocationQuery: EntityQuery, EntityStringQuery {
                     id: "current-gps",
                     name: NSLocalizedString("widget.location_option.current", comment: "")
                 )
-            } else if id.hasPrefix("city:") || id.hasPrefix("city_") {
-                let cityId = id.hasPrefix("city:") ? String(id.dropFirst("city:".count)) : String(id.dropFirst("city_".count))
+            } else if let portableCity = WidgetSavedCityPayload.city(from: id) {
+                // Resolve from the configured intent even when SideStore signing
+                // prevents the widget extension from mounting the shared App Group.
+                // When preferences are available, honor explicit removals/renames.
+                if isStoreAvailable && prefs.removedCityIDs.contains(portableCity.id) {
+                    return WidgetLocationEntity(
+                        id: id,
+                        name: NSLocalizedString("location.city_removed_widget", comment: "")
+                    )
+                }
+                let updatedName = prefs.city(for: portableCity.id)?.name
+                return WidgetLocationEntity(id: id, name: updatedName ?? portableCity.name)
+            } else if let cityId = WidgetSavedCityPayload.legacyCityID(from: id) {
                 if let city = prefs.savedCities.first(where: { $0.id == cityId }) {
                     return WidgetLocationEntity(id: id, name: city.name)
                 } else if !isStoreAvailable {
-                    // Shared store unreadable or unmounted: never claim city was removed
+                    // Older intent IDs lack coordinates. Ask for re-selection.
                     return WidgetLocationEntity(
                         id: id,
                         name: NSLocalizedString("widget.open_app_to_refresh", comment: "")
                     )
                 } else if prefs.removedCityIDs.contains(cityId) {
-                    // Verified explicit user removal
                     return WidgetLocationEntity(
                         id: id,
                         name: NSLocalizedString("location.city_removed_widget", comment: "")
                     )
                 } else {
-                    // Missing or pending synchronization
                     return WidgetLocationEntity(
                         id: id,
                         name: NSLocalizedString("widget.open_app_to_refresh", comment: "")
@@ -96,8 +105,12 @@ public struct WidgetLocationQuery: EntityQuery, EntityStringQuery {
         ]
 
         let prefs = LocationPreferencesStore.loadPreferences()
-        for city in prefs.savedCities {
-            results.append(WidgetLocationEntity(id: "city:\(city.id)", name: city.name))
+        for city in prefs.savedCities where city.isValid {
+            let portableID = WidgetSavedCityPayload.identifier(for: city)
+            guard !portableID.isEmpty else { continue }
+            // The selection itself carries verified coordinates and timezone,
+            // so a widget remains functional after third-party IPA signing.
+            results.append(WidgetLocationEntity(id: portableID, name: city.name))
         }
 
         return results

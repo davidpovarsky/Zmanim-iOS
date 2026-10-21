@@ -163,8 +163,14 @@ final class CityPersistenceAndWidgetTimelineTests: XCTestCase {
         // Suggested must include app-default, current-gps, and the saved city
         XCTAssertTrue(suggested.contains(where: { $0.id == "app-default" }))
         XCTAssertTrue(suggested.contains(where: { $0.id == "current-gps" }))
-        XCTAssertTrue(suggested.contains(where: { $0.id == "city:\(city.id)" }))
-        XCTAssertEqual(suggested.first(where: { $0.id == "city:\(city.id)" })?.name, "Ashdod")
+        let portableID = WidgetSavedCityPayload.identifier(for: city)
+        XCTAssertTrue(portableID.hasPrefix(WidgetSavedCityPayload.prefix))
+        XCTAssertTrue(suggested.contains(where: { $0.id == portableID }))
+        XCTAssertEqual(suggested.first(where: { $0.id == portableID })?.name, "Ashdod")
+        // Resolve precisely the same widget selection via the entity query.
+        let resolvedEntities = try await query.entities(for: [portableID])
+        XCTAssertEqual(resolvedEntities.first?.name, city.name)
+        XCTAssertEqual(WidgetSavedCityPayload.city(from: portableID), city)
     }
 
     // 8. App default and explicit city stay independent

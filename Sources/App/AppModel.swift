@@ -304,7 +304,13 @@ public final class AppModel: ObservableObject {
                     locationSignature: "\(newCity.name)-\(timeZoneID)",
                     sourceIdentity: identity
                 )
-                LocationSnapshotStore.saveSnapshot(fullSnap, for: identity)
+                if LocationSnapshotStore.saveSnapshot(fullSnap, for: identity) {
+                    // The full dataset may arrive after the first timeline
+                    // refresh, so wake saved-city widgets a second time.
+                    WidgetCenter.shared.reloadAllTimelines()
+                } else {
+                    Self.logger.error("Failed to persist complete saved-city widget snapshot")
+                }
             }
         }
 
@@ -393,8 +399,11 @@ public final class AppModel: ObservableObject {
                 locationSignature: "\(city.name)-\(city.timeZone.identifier)",
                 sourceIdentity: identity
             )
-            LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
-            WidgetCenter.shared.reloadAllTimelines()
+            if LocationSnapshotStore.saveSnapshot(snapshot, for: identity) {
+                WidgetCenter.shared.reloadAllTimelines()
+            } else {
+                Self.logger.error("Saved-city snapshot persistence failed; widget cache not updated")
+            }
 
             // If this is default location, reschedule notifications
             if case .savedCity(let defaultId) = locationPreferences.defaultChoice, defaultId == city.id {

@@ -5,15 +5,6 @@ import os
 import SwiftUI
 import WidgetKit
 
-enum ResolvedWidgetTarget: Sendable, Equatable {
-    case gps
-    case savedCity(SavedCity)
-    case sharedStoreUnavailable
-    case savedCityMissing(cityID: String)
-    case cityRemoved(cityID: String)
-    case invalidConfiguration
-}
-
 struct ConfigurableZmanProvider: AppIntentTimelineProvider {
     private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim.Widgets", category: "ConfigurableZmanProvider")
 
@@ -36,7 +27,10 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             return placeholder(in: context)
         }
 
-        let target = resolveTarget(from: configuration)
+        let target = WidgetTargetResolver.resolve(
+            identifier: configuration.location?.id,
+            preferencesResult: LocationPreferencesStore.loadPreferencesResult()
+        )
         switch target {
         case .gps:
             let identity = LocationIdentity.gps
@@ -57,31 +51,42 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         case .savedCity(let city):
             let identity = LocationIdentity.savedCity(id: city.id)
             let locationKey = identity.canonicalStorageKey
-            if let cached = LocationSnapshotStore.loadSnapshot(for: identity) {
-                let pager = UpcomingZmanPager(allItems: cached.items, referenceDate: .now, timeZone: cached.timeZone)
-                let note = SnapshotValidator.isFresh(snapshot: cached, for: identity, now: .now) ? nil : formatStaleNote(for: cached)
+            let now = Date()
+            let cached = LocationSnapshotStore.loadSnapshot(for: identity)
+            let validCache = cached.flatMap {
+                validCitySnapshot($0, for: city, at: now) ? $0 : nil
+            }
+            // WidgetKit may request only snapshot(for:) and postpone timeline(for:).
+            // Resolve saved-city times directly instead of leaving this view empty.
+            let selected: ZmanSnapshot?
+            if let validCache {
+                selected = validCache
+            } else {
+                selected = await fetchCitySnapshot(for: city, now: now)
+            }
+            if let selected {
+                let pager = UpcomingZmanPager(allItems: selected.items, referenceDate: now, timeZone: selected.timeZone)
                 return ZmanEntry(
-                    date: .now,
-                    snapshot: cached,
-                    state: note,
+                    date: now,
+                    snapshot: selected,
+                    state: nil,
                     pageIndex: 0,
                     pageCount: max(1, pager.pageCount),
                     isGPS: false,
                     locationKey: locationKey,
                     customCityName: city.name
                 )
-            } else {
-                return ZmanEntry(
-                    date: .now,
-                    snapshot: nil,
-                    state: String(format: NSLocalizedString("widget.open_app_to_refresh_city_format", comment: ""), city.name),
-                    pageIndex: 0,
-                    pageCount: 1,
-                    isGPS: false,
-                    locationKey: locationKey,
-                    customCityName: city.name
-                )
             }
+            return ZmanEntry(
+                date: now,
+                snapshot: nil,
+                state: String(format: NSLocalizedString("widget.open_app_to_refresh_city_format", comment: ""), city.name),
+                pageIndex: 0,
+                pageCount: 1,
+                isGPS: false,
+                locationKey: locationKey,
+                customCityName: city.name
+            )
         case .cityRemoved:
             return ZmanEntry(
                 date: .now,
@@ -132,7 +137,10 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
     func timeline(for configuration: WidgetLocationConfigurationIntent, in context: Context) async -> Timeline<ZmanEntry> {
         AppGroupDiagnostics.recordWidgetAck(processName: "widget.timeline")
         let now = Date()
-        let target = resolveTarget(from: configuration)
+        let target = WidgetTargetResolver.resolve(
+            identifier: configuration.location?.id,
+            preferencesResult: LocationPreferencesStore.loadPreferencesResult()
+        )
 
         switch target {
         case .cityRemoved:
@@ -197,7 +205,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             let pageState = WidgetPageStateStore.loadState(for: locationKey)
             let cached = LocationSnapshotStore.loadSnapshot(for: identity)
 
-            if let cached, SnapshotValidator.isFresh(snapshot: cached, for: identity, now: now) {
+            if let cached, validCitySnapshot(cached, for: city, at: now) {
                 return makeTimeline(
                     snapshot: cached,
                     now: now,
@@ -209,45 +217,22 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                 )
             }
 
-            // Missing or stale: fetch Hebcal for city coordinates
-            let cityLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
-            do {
-                let items = try await HebcalService.fetchDays(
-                    location: cityLocation,
-                    timeZone: city.timeZone,
-                    starting: now,
-                    count: 2
+            // The city is carried by the AppIntent itself. Fetch even if the
+            // App Group is unavailable; never substitute another city or GPS.
+            if let fresh = await fetchCitySnapshot(for: city, now: now) {
+                return makeTimeline(
+                    snapshot: fresh,
+                    now: now,
+                    state: nil,
+                    pageState: pageState,
+                    isGPS: false,
+                    locationKey: locationKey,
+                    customCityName: city.name
                 )
-                if !items.isEmpty {
-                    let snapshot = ZmanSnapshot(
-                        cityName: city.name,
-                        timeZoneID: city.timeZone.identifier,
-                        latitude: city.latitude,
-                        longitude: city.longitude,
-                        updatedAt: now,
-                        items: items,
-                        locationSignature: "\(city.name)-\(city.timeZone.identifier)",
-                        sourceIdentity: identity
-                    )
-                    _ = LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
-                    return makeTimeline(
-                        snapshot: snapshot,
-                        now: now,
-                        state: nil,
-                        pageState: pageState,
-                        isGPS: false,
-                        locationKey: locationKey,
-                        customCityName: city.name
-                    )
-                }
-            } catch {
-                #if DEBUG
-                Self.logger.error("Failed to fetch Hebcal for city \(city.name): \(error.localizedDescription, privacy: .public)")
-                #endif
             }
 
-            // Fallback to stale cache if available and authentic
-            if let cached, !cached.items.isEmpty, cached.validTimeZone != nil {
+            // Show old times only when they belong to this exact city.
+            if let cached, structurallyValidCitySnapshot(cached, for: city) {
                 let note = formatStaleNote(for: cached)
                 return makeTimeline(
                     snapshot: cached,
@@ -396,56 +381,76 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
         return (state, nil)
     }
 
-    private func resolveTarget(from intent: WidgetLocationConfigurationIntent) -> ResolvedWidgetTarget {
-        let prefsResult = LocationPreferencesStore.loadPreferencesResult()
-        let prefs: LocationPreferences
-        switch prefsResult {
-        case .loaded(let loaded):
-            prefs = loaded
-        case .noPreferencesYet:
-            prefs = LocationPreferences()
-        case .storeUnavailable:
-            return .sharedStoreUnavailable
-        case .corruptData:
-            return .invalidConfiguration
-        }
-
-        guard let locationParam = intent.location else {
-            // Intent is unconfigured: follow app default
-            return resolveAppDefault(prefs: prefs)
-        }
-
-        let paramId = locationParam.id
-        if paramId == "app-default" {
-            return resolveAppDefault(prefs: prefs)
-        } else if paramId == "current-gps" {
-            return .gps
-        } else if paramId.hasPrefix("city:") || paramId.hasPrefix("city_") {
-            let cityId = paramId.hasPrefix("city:") ? String(paramId.dropFirst("city:".count)) : String(paramId.dropFirst("city_".count))
-            if let city = prefs.savedCities.first(where: { $0.id == cityId }) {
-                return .savedCity(city)
-            } else if prefs.removedCityIDs.contains(cityId) {
-                return .cityRemoved(cityID: cityId)
-            } else {
-                return .savedCityMissing(cityID: cityId)
-            }
-        }
-
-        return .invalidConfiguration
+    private func structurallyValidCitySnapshot(_ snapshot: ZmanSnapshot, for city: SavedCity) -> Bool {
+        let identity = LocationIdentity.savedCity(id: city.id)
+        guard snapshot.sourceIdentity == identity,
+              snapshot.timeZoneID == city.timeZoneID,
+              !snapshot.items.isEmpty,
+              snapshot.locationSignature != "demo" else { return false }
+        let cachedLocation = CLLocation(latitude: snapshot.latitude, longitude: snapshot.longitude)
+        let cityLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
+        return cachedLocation.distance(from: cityLocation) <= 1_000
     }
 
-    private func resolveAppDefault(prefs: LocationPreferences) -> ResolvedWidgetTarget {
-        switch prefs.defaultChoice {
-        case .current:
-            return .gps
-        case .savedCity(let id):
-            if let city = prefs.savedCities.first(where: { $0.id == id }) {
-                return .savedCity(city)
-            } else if prefs.removedCityIDs.contains(id) {
-                return .cityRemoved(cityID: id)
-            } else {
-                return .savedCityMissing(cityID: id)
+    private func validCitySnapshot(_ snapshot: ZmanSnapshot, for city: SavedCity, at now: Date) -> Bool {
+        guard structurallyValidCitySnapshot(snapshot, for: city) else { return false }
+        let identity = LocationIdentity.savedCity(id: city.id)
+        switch SnapshotValidator.validate(
+            snapshot: snapshot,
+            for: identity,
+            expectedCoordinates: CLLocationCoordinate2D(latitude: city.latitude, longitude: city.longitude),
+            maxCoordinateDistanceMeters: 1_000,
+            expectedTimeZoneID: city.timeZoneID,
+            requiredDate: now,
+            requireTomorrowCoverage: true
+        ) {
+        case .success:
+            return true
+        case .failure:
+            return false
+        }
+    }
+
+    private func fetchCitySnapshot(for city: SavedCity, now: Date) async -> ZmanSnapshot? {
+        guard city.isValid, let zone = city.validTimeZone else {
+            Self.logger.error("Rejected invalid saved-city widget configuration")
+            return nil
+        }
+        let identity = LocationIdentity.savedCity(id: city.id)
+        let coordinate = CLLocation(latitude: city.latitude, longitude: city.longitude)
+        do {
+            let items = try await HebcalService.fetchTodayAndTomorrow(
+                location: coordinate,
+                timeZone: zone,
+                starting: now
+            )
+            guard !items.isEmpty else {
+                Self.logger.error("Hebcal returned no saved-city zmanim")
+                return nil
             }
+            let snapshot = ZmanSnapshot(
+                cityName: city.name,
+                timeZoneID: city.timeZoneID,
+                latitude: city.latitude,
+                longitude: city.longitude,
+                updatedAt: Date(),
+                items: items,
+                locationSignature: "\(city.name)-\(city.timeZoneID)",
+                sourceIdentity: identity
+            )
+            guard validCitySnapshot(snapshot, for: city, at: now) else {
+                Self.logger.error("Hebcal saved-city response failed identity or date validation")
+                return nil
+            }
+            if !LocationSnapshotStore.saveSnapshot(snapshot, for: identity) {
+                // Continue displaying authentic fetched data even when the
+                // widget cannot access the shared container after signing.
+                Self.logger.warning("Saved-city times fetched but App Group snapshot write unavailable")
+            }
+            return snapshot
+        } catch {
+            Self.logger.error("Saved-city widget Hebcal fetch failed: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
