@@ -37,6 +37,10 @@ Useful technical discoveries, undocumented behavior, shortcuts, implementation t
 - **Multi-Location Cache Isolation & Front-Loaded Hebcal Queries**: Partitioning `WeatherCache` entries by coordinate keys and splitting Hebcal requests into an immediate 2-day priority fetch and deferred 6-day background fetch guarantees instant, synchronized UI transitions without cross-city cache invalidation races.
 - **WidgetKit StaticConfiguration Instance Isolation Boundary**: In WidgetKit `StaticConfiguration`, timeline providers and `AppIntent` handlers do not receive a persistent per-instance widget ID. Attempting to simulate per-widget state without an `AppIntentConfiguration` parameter creates desynchronization. Shared state with 60-second expiration remains the standard best-effort model.
 - **Atomic City Search & Time Zone Resolution**: Sourcing suggestions through `MKLocalSearchCompleter` and resolving coordinates and time zones atomically via `MKLocalSearch` prevents corrupted halachic times and out-of-order race conditions when switching between GPS and fixed locations.
+- **WeatherSceneModel Nested ObservableObject Observation Invalidation**: In SwiftUI, declaring `@Published var weatherModel = WeatherSceneModel()` on an `ObservableObject` parent only invalidates when the reference changes, not when internal `@Published` properties mutate. Introducing a focused `@ObservedObject` consumer view (`WeatherAwareHomeContent`) ensures instant view invalidations upon forecast arrival without polling timers or full-screen redraws.
+- **Parallel Decoupled Weather and Hebcal Task Scheduling**: Decoupling MET Norway weather loading from 8-day Hebcal scheduling ensures instant weather presentation (<1s) on city transitions. Recomputing dynamic solar sky context via `recomputeSkyContext(sunrise:sunset:)` once Hebcal arrives eliminates redundant secondary MET Norway network calls.
+- **Deterministic SHA-256 Legacy Entity IDs & Persistence Transaction Safety**: Deriving legacy migration IDs from SHA-256 rather than `String.hashValue` prevents cross-process entity ID divergence between App and WidgetKit extension. Enforcing snapshot write and verification before `WidgetCenter.reloadAllTimelines()` guarantees widgets resolve authentic city zmanim immediately.
+- **Cross-Process App Group Diagnostics Handshake**: Implementing an automated nonce-and-ACK handshake between the host app and the widget extension detects post-signing App Group container detachment in alternative app distribution environments (e.g. SideStore) without logging sensitive location data.
 
 ## Experiments / Investigations
 
@@ -58,6 +62,10 @@ Use Markdown checkboxes where useful:
 
 Completed items that are still useful to retain because they document an important decision, discovery, or implementation.
 
+- [x] Fix Weather Observation & Auto-Refresh, City Persistence Safety, and Widget Saved City Timelines
+  - Implemented: 2026-10-21
+  - Branch: `feature/met-weather-widget-paging-eod`
+  - Notes: Resolved P0-WEATHER by introducing `WeatherAwareHomeContent` with direct `@ObservedObject` observation of `WeatherSceneModel`, immediate decoupled weather task scheduling on city transitions, and in-flight request cancellation with generation guards; resolved P0-WIDGET-CITY by eliminating phantom `fallbackCity` UUID generation, enforcing priority snapshot persistence and validation prior to `reloadAllTimelines()`, making widget `timeline(for:)` fetch genuine city Hebcal times on demand, replacing non-deterministic `hashValue` with SHA-256 in `StableLegacyCityID`, and implementing bidirectional `AppGroupDiagnostics` handshake.
 - [x] Widget Now-Based Paging, Location Localization, Multiple Saved Cities, and Independent Widget Configuration
   - Implemented: 2026-10-20
   - Branch: `feature/met-weather-widget-paging-eod`

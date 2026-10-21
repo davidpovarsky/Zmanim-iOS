@@ -27,6 +27,7 @@ public final class WeatherSceneModel: ObservableObject {
 
     private var currentCoordinate: CLLocationCoordinate2D?
     private var currentCityName: String = ""
+    public private(set) var currentSnapshotTimeZone: TimeZone? = nil
     private var updateGeneration: UInt64 = 0
 
     public init() {
@@ -36,6 +37,7 @@ public final class WeatherSceneModel: ObservableObject {
         self.cloudCover = 0.0
         self.currentSnapshot = nil
         self.weatherDisplay = nil
+        self.currentSnapshotTimeZone = nil
     }
 
     /// Updates the weather state strictly using genuine MET Norway data or cached snapshot.
@@ -52,6 +54,7 @@ public final class WeatherSceneModel: ObservableObject {
         let generation = self.updateGeneration
         self.currentCoordinate = location
         self.currentCityName = cityName
+        self.currentSnapshotTimeZone = timeZone
 
         #if DEBUG
         if let preview = previewOverride {
@@ -151,6 +154,49 @@ public final class WeatherSceneModel: ObservableObject {
         }
     }
 
+    /// Recomputes dynamic sky condition from existing snapshot once sunrise/sunset arrive from Hebcal.
+    /// Strictly avoids redundant network requests to MET Norway when valid forecast data is already present.
+    public func recomputeSkyContext(
+        sunrise: Date?,
+        sunset: Date?,
+        now: Date = Date()
+    ) {
+        guard let snapshot = currentSnapshot, isAvailable else { return }
+        let zone = currentSnapshotTimeZone ?? .current
+
+        let currentHour = snapshot.hours.first(where: { abs($0.time.timeIntervalSince(now)) <= 3600 })
+            ?? snapshot.hours.last(where: { $0.time <= now && now.timeIntervalSince($0.time) <= 7200 })
+        let rawSymbol = currentHour?.symbolCode ?? "unknown"
+
+        let isNight: Bool
+        if let sunrise, let sunset, sunset > sunrise {
+            isNight = now < sunrise || now > sunset
+        } else if rawSymbol.hasSuffix("_night") {
+            isNight = true
+        } else if rawSymbol.hasSuffix("_day") {
+            isNight = false
+        } else {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = zone
+            let hour = cal.component(.hour, from: now)
+            isNight = hour < 6 || hour >= 19
+        }
+
+        let iconKey = METLocationWeatherConverter.iconKey(from: rawSymbol)
+        let resolvedCondition = ZmanimWeatherDisplayAdapter.resolveSkyCondition(
+            iconKey: iconKey,
+            isNight: isNight,
+            sunrise: sunrise,
+            sunset: sunset,
+            now: now
+        )
+
+        let clouds: Double = (currentHour?.cloudAreaFractionPercent.map { $0 / 100.0 }) ?? 0.0
+
+        self.condition = resolvedCondition
+        self.cloudCover = clouds
+    }
+
     /// Resets the model when changing locations or cities.
     public func resetForLocationChange() {
         self.updateGeneration &+= 1
@@ -159,6 +205,7 @@ public final class WeatherSceneModel: ObservableObject {
         self.condition = nil
         self.cloudCover = 0.0
         self.isAvailable = false
+        self.currentSnapshotTimeZone = nil
     }
 
     #if DEBUG
@@ -198,103 +245,22 @@ public final class WeatherSceneModel: ObservableObject {
         self.condition = preview.condition
         self.cloudCover = preview.cloudCover
         self.lastUpdated = now
-
-        let mockHours: [WeatherHour] = (0..<25).map { i in
-            let hourDate = now.addingTimeInterval(Double(i * 3600))
-            return WeatherHour(
-                time: hourDate,
-                temperatureCelsius: 18.0 + Double(i % 5),
-                windMetersPerSecond: 3.5,
-                precipitationChancePercent: preview == .rain ? 80.0 : (preview == .snow ? 70.0 : 0.0),
-                cloudAreaFractionPercent: preview.cloudCover * 100.0,
-                symbolCode: preview.symbolCode,
-                iconKey: preview.iconKey
-            )
-        }
-
-        let mockSnapshot = WeatherSnapshot(
-            hours: mockHours,
-            retrievedAt: now,
-            locationLatitude: 31.778,
-            locationLongitude: 35.235,
-            expiresAt: now.addingTimeInterval(1800)
-        )
-
-        self.currentSnapshot = mockSnapshot
-        self.weatherDisplay = ZmanimWeatherDisplayAdapter.makeWeatherDisplay(
-            from: mockSnapshot,
+        self.weatherDisplay = WeatherDisplay(
             cityName: cityName,
             timeZone: timeZone,
-            now: now
+            buttonTitle: "22°",
+            header: WeatherDisplay.Header(
+                iconName: "sun.max.fill",
+                temperature: "22°",
+                conditionSummary: "בהיר"
+            ),
+            stats: [
+                WeatherDisplay.Stat(label: "משקעים", value: "0%"),
+                WeatherDisplay.Stat(label: "רוח", value: "3 קמ״ש"),
+                WeatherDisplay.Stat(label: "עננות", value: "\(Int(preview.cloudCover * 100))%")
+            ],
+            hourly: []
         )
     }
     #endif
 }
-
-#if DEBUG
-public enum WeatherScenePreview: String, CaseIterable, Identifiable {
-    case clearMorning = "בוקר בהיר"
-    case middaySun = "צהריים שטופי שמש"
-    case partlyCloudyAfternoon = "אחר הצהריים מעונן חלקית"
-    case overcastAfternoon = "אחר הצהריים מעונן"
-    case goldenSunset = "שקיעה זהובה"
-    case twilight = "דמדומים"
-    case clearNight = "לילה בהיר זרוע כוכבים"
-    case rain = "גשם"
-    case snow = "שלג"
-    case fog = "ערפל"
-
-    public var id: String { rawValue }
-
-    public var condition: WeatherCondition {
-        switch self {
-        case .clearMorning, .middaySun: return .clearDay
-        case .partlyCloudyAfternoon: return .partlyCloudyDay
-        case .overcastAfternoon: return .overcastDay
-        case .goldenSunset: return .sunset
-        case .twilight: return .sunrise
-        case .clearNight: return .clearNight
-        case .rain: return .rain
-        case .snow: return .snow
-        case .fog: return .fog
-        }
-    }
-
-    public var cloudCover: Double {
-        switch self {
-        case .clearMorning, .middaySun, .clearNight: return 0.0
-        case .partlyCloudyAfternoon: return 0.45
-        case .overcastAfternoon: return 0.85
-        case .goldenSunset, .twilight: return 0.15
-        case .rain: return 0.90
-        case .snow: return 0.80
-        case .fog: return 0.70
-        }
-    }
-
-    public var symbolCode: String {
-        switch self {
-        case .clearMorning, .middaySun: return "clearsky_day"
-        case .partlyCloudyAfternoon: return "partlycloudy_day"
-        case .overcastAfternoon: return "cloudy"
-        case .goldenSunset, .twilight: return "clearsky_day"
-        case .clearNight: return "clearsky_night"
-        case .rain: return "rain"
-        case .snow: return "snow"
-        case .fog: return "fog"
-        }
-    }
-
-    public var iconKey: String {
-        switch self {
-        case .clearMorning, .middaySun, .goldenSunset, .twilight: return "clear-day"
-        case .partlyCloudyAfternoon: return "partly-cloudy-day"
-        case .overcastAfternoon: return "cloudy"
-        case .clearNight: return "clear-night"
-        case .rain: return "rain"
-        case .snow: return "snow"
-        case .fog: return "fog"
-        }
-    }
-}
-#endif

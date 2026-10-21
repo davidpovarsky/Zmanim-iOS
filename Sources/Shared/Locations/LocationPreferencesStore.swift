@@ -86,7 +86,19 @@ public enum LocationPreferencesStore {
     }
 
     public static func setDefaultChoiceThrowing(_ choice: LocationChoice) throws -> LocationPreferences {
-        var prefs = loadPreferences()
+        let prefsResult = loadPreferencesResult()
+        var prefs: LocationPreferences
+        switch prefsResult {
+        case .loaded(let loaded):
+            prefs = loaded
+        case .noPreferencesYet:
+            prefs = LocationPreferences()
+        case .storeUnavailable:
+            throw LocationStoreError.storeUnavailable
+        case .corruptData(let reason):
+            throw LocationStoreError.corruptData(reason)
+        }
+
         prefs.defaultChoice = choice
         try savePreferencesThrowing(prefs)
         return prefs
@@ -103,7 +115,19 @@ public enum LocationPreferencesStore {
         longitude: Double,
         timeZoneID: String
     ) throws -> (preferences: LocationPreferences, city: SavedCity) {
-        var prefs = loadPreferences()
+        let prefsResult = loadPreferencesResult()
+        var prefs: LocationPreferences
+        switch prefsResult {
+        case .loaded(let loaded):
+            prefs = loaded
+        case .noPreferencesYet:
+            prefs = LocationPreferences()
+        case .storeUnavailable:
+            throw LocationStoreError.storeUnavailable
+        case .corruptData(let reason):
+            logger.error("Cannot add city because existing preferences are corrupt: \(reason, privacy: .public)")
+            throw LocationStoreError.corruptData(reason)
+        }
 
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -139,15 +163,28 @@ public enum LocationPreferencesStore {
         longitude: Double,
         timeZoneID: String
     ) -> (preferences: LocationPreferences, city: SavedCity) {
-        if let result = try? addCityThrowing(name: name, latitude: latitude, longitude: longitude, timeZoneID: timeZoneID) {
-            return result
+        do {
+            return try addCityThrowing(name: name, latitude: latitude, longitude: longitude, timeZoneID: timeZoneID)
+        } catch {
+            logger.error("addCity failed: \(error.localizedDescription, privacy: .public)")
+            return (loadPreferences(), SavedCity(id: "", name: name, latitude: latitude, longitude: longitude, timeZoneID: timeZoneID))
         }
-        let fallbackCity = SavedCity(id: UUID().uuidString, name: name, latitude: latitude, longitude: longitude, timeZoneID: timeZoneID)
-        return (loadPreferences(), fallbackCity)
     }
 
     public static func removeCityThrowing(id: String) throws -> LocationPreferences {
-        var prefs = loadPreferences()
+        let prefsResult = loadPreferencesResult()
+        var prefs: LocationPreferences
+        switch prefsResult {
+        case .loaded(let loaded):
+            prefs = loaded
+        case .noPreferencesYet:
+            prefs = LocationPreferences()
+        case .storeUnavailable:
+            throw LocationStoreError.storeUnavailable
+        case .corruptData(let reason):
+            throw LocationStoreError.corruptData(reason)
+        }
+
         prefs.savedCities.removeAll { $0.id == id }
 
         // Track that this city ID was explicitly removed by the user
@@ -175,7 +212,19 @@ public enum LocationPreferencesStore {
     }
 
     public static func reorderCitiesThrowing(_ reordered: [SavedCity]) throws -> LocationPreferences {
-        var prefs = loadPreferences()
+        let prefsResult = loadPreferencesResult()
+        var prefs: LocationPreferences
+        switch prefsResult {
+        case .loaded(let loaded):
+            prefs = loaded
+        case .noPreferencesYet:
+            prefs = LocationPreferences()
+        case .storeUnavailable:
+            throw LocationStoreError.storeUnavailable
+        case .corruptData(let reason):
+            throw LocationStoreError.corruptData(reason)
+        }
+
         var updated = reordered
         for index in updated.indices {
             updated[index].order = index
@@ -200,9 +249,13 @@ public enum LocationPreferencesStore {
         if let resolved = legacy.resolvedFixedLocation,
            !resolved.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let cleanName = resolved.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-            // Deterministic stable ID derived from the name and coordinates to prevent UUID drift across unpersisted reads
-            let stableHash = abs("\(cleanName)_\(resolved.latitude)_\(resolved.longitude)".hashValue)
-            let stableID = "legacy_\(stableHash)"
+            // Deterministic stable ID derived from SHA-256 to guarantee cross-process and launch stability
+            let stableID = StableLegacyCityID.generate(
+                name: cleanName,
+                latitude: resolved.latitude,
+                longitude: resolved.longitude,
+                timeZoneID: resolved.timeZoneID
+            )
 
             let city = SavedCity(
                 id: stableID,

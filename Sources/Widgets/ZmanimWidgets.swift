@@ -56,17 +56,29 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             }
         case .savedCity(let city):
             let identity = LocationIdentity.savedCity(id: city.id)
-            if let cached = LocationSnapshotStore.loadSnapshot(for: identity),
-               SnapshotValidator.isFresh(snapshot: cached, for: identity, now: .now) {
+            let locationKey = identity.canonicalStorageKey
+            if let cached = LocationSnapshotStore.loadSnapshot(for: identity) {
                 let pager = UpcomingZmanPager(allItems: cached.items, referenceDate: .now, timeZone: cached.timeZone)
+                let note = SnapshotValidator.isFresh(snapshot: cached, for: identity, now: .now) ? nil : formatStaleNote(for: cached)
                 return ZmanEntry(
                     date: .now,
                     snapshot: cached,
-                    state: nil,
+                    state: note,
                     pageIndex: 0,
-                    pageCount: pager.pageCount,
+                    pageCount: max(1, pager.pageCount),
                     isGPS: false,
-                    locationKey: identity.canonicalStorageKey,
+                    locationKey: locationKey,
+                    customCityName: city.name
+                )
+            } else {
+                return ZmanEntry(
+                    date: .now,
+                    snapshot: nil,
+                    state: String(format: NSLocalizedString("widget.open_app_to_refresh_city_format", comment: ""), city.name),
+                    pageIndex: 0,
+                    pageCount: 1,
+                    isGPS: false,
+                    locationKey: locationKey,
                     customCityName: city.name
                 )
             }
@@ -118,6 +130,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
     }
 
     func timeline(for configuration: WidgetLocationConfigurationIntent, in context: Context) async -> Timeline<ZmanEntry> {
+        AppGroupDiagnostics.recordWidgetAck(processName: "widget.timeline")
         let now = Date()
         let target = resolveTarget(from: configuration)
 
@@ -203,7 +216,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
                     location: cityLocation,
                     timeZone: city.timeZone,
                     starting: now,
-                    count: 3
+                    count: 2
                 )
                 if !items.isEmpty {
                     let snapshot = ZmanSnapshot(
@@ -407,8 +420,8 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             return resolveAppDefault(prefs: prefs)
         } else if paramId == "current-gps" {
             return .gps
-        } else if paramId.hasPrefix("city:") {
-            let cityId = String(paramId.dropFirst("city:".count))
+        } else if paramId.hasPrefix("city:") || paramId.hasPrefix("city_") {
+            let cityId = paramId.hasPrefix("city:") ? String(paramId.dropFirst("city:".count)) : String(paramId.dropFirst("city_".count))
             if let city = prefs.savedCities.first(where: { $0.id == cityId }) {
                 return .savedCity(city)
             } else if prefs.removedCityIDs.contains(cityId) {
@@ -418,7 +431,7 @@ struct ConfigurableZmanProvider: AppIntentTimelineProvider {
             }
         }
 
-        return resolveAppDefault(prefs: prefs)
+        return .invalidConfiguration
     }
 
     private func resolveAppDefault(prefs: LocationPreferences) -> ResolvedWidgetTarget {

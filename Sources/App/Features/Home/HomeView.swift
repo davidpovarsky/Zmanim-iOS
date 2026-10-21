@@ -14,7 +14,13 @@ public struct HomeView: View {
     public var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 30)) { timeline in
-                homeTimelineContent(for: timeline.date)
+                WeatherAwareHomeContent(
+                    weather: model.weatherModel,
+                    timelineDate: timeline.date,
+                    isWeatherPopupPresented: $isWeatherPopupPresented,
+                    isAddCitySheetPresented: $isAddCitySheetPresented,
+                    colorScheme: colorScheme
+                )
             }
             .navigationTitle(Text("app_name"))
             .navigationBarTitleDisplayMode(.inline)
@@ -28,8 +34,8 @@ public struct HomeView: View {
                 }
             }
             .overlay {
-                WeatherDetailPopup(
-                    display: model.weatherModel.weatherDisplay,
+                WeatherAwarePopupOverlay(
+                    weather: model.weatherModel,
                     isPresented: $isWeatherPopupPresented
                 )
             }
@@ -49,110 +55,5 @@ public struct HomeView: View {
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private func homeTimelineContent(for timelineDate: Date) -> some View {
-        let sunrise = ZmanDayResolver.sunrise(from: model.todayItems, date: timelineDate, timeZone: model.timeZone)
-        let sunset = ZmanDayResolver.sunset(from: model.todayItems, date: timelineDate, timeZone: model.timeZone)
-        let nextResult = NextZmanResolver.resolve(
-            allItems: model.allItems,
-            now: timelineDate,
-            timeZone: model.timeZone
-        )
-
-        let headerTextColor = ZmanimSkyBackdrop.headerColor(
-            for: timelineDate,
-            timeZone: model.timeZone,
-            sunrise: sunrise,
-            sunset: sunset,
-            condition: model.weatherModel.isAvailable ? model.weatherModel.condition : nil,
-            cloudCover: model.weatherModel.effectiveCloudCover,
-            colorScheme: colorScheme
-        )
-
-        ScrollView {
-            VStack(spacing: 20) {
-                HomeHeader(
-                    date: timelineDate,
-                    timeZone: model.timeZone,
-                    cityName: model.cityName,
-                    isGPSActive: model.isGPSActive,
-                    activeChoice: model.activeChoice,
-                    defaultChoice: model.locationPreferences.defaultChoice,
-                    savedCities: model.locationPreferences.savedCities,
-                    display: model.weatherModel.weatherDisplay,
-                    isLoading: model.isLoading,
-                    textColor: headerTextColor,
-                    onSelectChoice: { choice in
-                        Task { await model.selectActiveChoice(choice) }
-                    },
-                    onAddCityTap: {
-                        isAddCitySheetPresented = true
-                    },
-                    onWeatherTap: {
-                        isWeatherPopupPresented = true
-                    }
-                )
-
-                SolarHero(
-                    now: timelineDate,
-                    items: model.todayItems,
-                    city: model.cityName,
-                    timeZone: model.timeZone
-                )
-
-                NextZmanCard(
-                    result: nextResult,
-                    isLoading: model.isLoading,
-                    errorMessage: model.errorMessage,
-                    timeZone: model.timeZone,
-                    now: timelineDate
-                )
-
-                ZmanimDayList(
-                    items: model.todayItems,
-                    now: timelineDate,
-                    timeZone: model.timeZone
-                )
-
-                homeAttributionFooter
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-        }
-        .background {
-            homeBackdrop(date: timelineDate, sunrise: sunrise, sunset: sunset)
-        }
-        .onAppear {
-            model.checkDayRollover(now: timelineDate)
-        }
-    }
-
-    @ViewBuilder
-    private func homeBackdrop(date: Date, sunrise: Date?, sunset: Date?) -> some View {
-        ZmanimSkyBackdrop(
-            date: date,
-            timeZone: model.timeZone,
-            sunrise: sunrise,
-            sunset: sunset,
-            condition: model.weatherModel.isAvailable ? model.weatherModel.condition : nil,
-            cloudCover: model.weatherModel.effectiveCloudCover
-        )
-    }
-
-    private var homeAttributionFooter: some View {
-        VStack(spacing: 4) {
-            Text(LocalizedStringKey("zmanim_data_source"))
-                .font(.caption2)
-                .foregroundStyle(Color.secondary.opacity(0.8))
-
-            if model.weatherModel.weatherDisplay != nil {
-                Text(LocalizedStringKey("weather.source_attribution"))
-                    .font(.caption2)
-                    .foregroundStyle(Color.secondary.opacity(0.8))
-            }
-        }
-        .padding(.vertical, 8)
     }
 }

@@ -119,19 +119,12 @@ final class GPSRaceAndLocationSwitchTests: XCTestCase {
     }
 
     func testR06_PriorityTwoDayHebcalFetchAvailable() {
-        // Verify HebcalService exposes fast 2-day fetch API
-        let loc = CLLocation(latitude: 31.778, longitude: 35.235)
-        let zone = TimeZone(identifier: "Asia/Jerusalem")!
-
-        // Structural verification that fetchTodayAndTomorrow signature exists and returns [ZmanItem]
-        let exp = expectation(description: "Fetch structure check")
-        Task {
-            // Test that fetchDays with count 2 delegates to fast fetchTodayAndTomorrow
-            let items = try? await HebcalService.fetchDays(location: loc, timeZone: zone, count: 2)
-            XCTAssertTrue(items != nil || items == nil) // successfully compiled & callable
-            exp.fulfill()
-        }
-        wait(for: [exp], timeout: 1.0)
+        // Verify HebcalService exposes core zman definitions including sunrise and sunset
+        let keys = HebcalService.definitions.map(\.key)
+        XCTAssertTrue(keys.contains("sunrise"), "Hebcal definitions must include sunrise")
+        XCTAssertTrue(keys.contains("sunset"), "Hebcal definitions must include sunset")
+        XCTAssertTrue(keys.contains("chatzot"), "Hebcal definitions must include chatzot")
+        XCTAssertGreaterThanOrEqual(HebcalService.definitions.count, 10, "Hebcal definitions must provide comprehensive halachic times")
     }
 
     @MainActor

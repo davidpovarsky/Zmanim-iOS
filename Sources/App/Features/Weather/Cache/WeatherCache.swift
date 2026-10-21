@@ -20,6 +20,7 @@ public actor WeatherCache {
     }
 
     /// Retrieves a valid, unexpired cached snapshot for the given coordinate and time zone.
+    /// Strictly prefers the closest authentic point when multiple entries exist.
     public func getCached(
         latitude: Double,
         longitude: Double,
@@ -27,6 +28,7 @@ public actor WeatherCache {
         now: Date = Date()
     ) -> WeatherSnapshot? {
         let queryLoc = CLLocation(latitude: latitude, longitude: longitude)
+        var bestMatch: (snapshot: WeatherSnapshot, distance: CLLocationDistance)? = nil
 
         for entry in entries.values {
             guard entry.timeZoneID == timeZoneID else { continue }
@@ -35,11 +37,18 @@ public actor WeatherCache {
                 continue
             }
             let cachedLoc = CLLocation(latitude: snap.locationLatitude, longitude: snap.locationLongitude)
-            if cachedLoc.distance(from: queryLoc) < 5000 {
-                return snap
+            let distance = cachedLoc.distance(from: queryLoc)
+            if distance < 5000 {
+                if let currentBest = bestMatch {
+                    if distance < currentBest.distance {
+                        bestMatch = (snap, distance)
+                    }
+                } else {
+                    bestMatch = (snap, distance)
+                }
             }
         }
-        return nil
+        return bestMatch?.snapshot
     }
 
     /// Stores a new snapshot along with its time zone.
@@ -51,17 +60,26 @@ public actor WeatherCache {
     /// Retrieves the Last-Modified header value for conditional HTTP requests if coordinates match.
     public func getLastModified(latitude: Double, longitude: Double) -> String? {
         let queryLoc = CLLocation(latitude: latitude, longitude: longitude)
+        var bestMatch: (lastModified: String?, distance: CLLocationDistance)? = nil
+
         for entry in entries.values {
             let snap = entry.snapshot
             let cachedLoc = CLLocation(latitude: snap.locationLatitude, longitude: snap.locationLongitude)
-            if cachedLoc.distance(from: queryLoc) < 5000 {
-                return snap.lastModified
+            let distance = cachedLoc.distance(from: queryLoc)
+            if distance < 5000 {
+                if let currentBest = bestMatch {
+                    if distance < currentBest.distance {
+                        bestMatch = (snap.lastModified, distance)
+                    }
+                } else {
+                    bestMatch = (snap.lastModified, distance)
+                }
             }
         }
-        return nil
+        return bestMatch?.lastModified
     }
 
-    /// Extends expiration on HTTP 304 Not Modified.
+    /// Extends expiration on HTTP 304 Not Modified for the specified coordinate.
     public func refreshExpiration(latitude: Double? = nil, longitude: Double? = nil, newExpiresAt: Date?) {
         if let latitude, let longitude {
             let queryLoc = CLLocation(latitude: latitude, longitude: longitude)
@@ -81,8 +99,8 @@ public actor WeatherCache {
                     return
                 }
             }
-        } else if let firstKey = entries.keys.first, let existing = entries[firstKey]?.snapshot {
-            entries[firstKey]?.snapshot = WeatherSnapshot(
+        } else if entries.count == 1, let singleKey = entries.keys.first, let existing = entries[singleKey]?.snapshot {
+            entries[singleKey]?.snapshot = WeatherSnapshot(
                 hours: existing.hours,
                 retrievedAt: Date(),
                 locationLatitude: existing.locationLatitude,

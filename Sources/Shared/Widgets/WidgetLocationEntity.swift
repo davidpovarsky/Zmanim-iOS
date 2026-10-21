@@ -24,6 +24,8 @@ public struct WidgetLocationQuery: EntityQuery, EntityStringQuery {
     public init() {}
 
     public func entities(for identifiers: [String]) async throws -> [WidgetLocationEntity] {
+        AppGroupDiagnostics.recordWidgetAck(processName: "widget.query")
+
         let prefsResult = LocationPreferencesStore.loadPreferencesResult()
         let prefs: LocationPreferences
         let isStoreAvailable: Bool
@@ -51,8 +53,8 @@ public struct WidgetLocationQuery: EntityQuery, EntityStringQuery {
                     id: "current-gps",
                     name: NSLocalizedString("widget.location_option.current", comment: "")
                 )
-            } else if id.hasPrefix("city:") {
-                let cityId = String(id.dropFirst("city:".count))
+            } else if id.hasPrefix("city:") || id.hasPrefix("city_") {
+                let cityId = id.hasPrefix("city:") ? String(id.dropFirst("city:".count)) : String(id.dropFirst("city_".count))
                 if let city = prefs.savedCities.first(where: { $0.id == cityId }) {
                     return WidgetLocationEntity(id: id, name: city.name)
                 } else if !isStoreAvailable {
@@ -80,6 +82,8 @@ public struct WidgetLocationQuery: EntityQuery, EntityStringQuery {
     }
 
     public func suggestedEntities() async throws -> [WidgetLocationEntity] {
+        AppGroupDiagnostics.recordWidgetAck(processName: "widget.query.suggested")
+
         var results: [WidgetLocationEntity] = [
             WidgetLocationEntity(
                 id: "app-default",
