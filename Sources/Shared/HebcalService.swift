@@ -21,6 +21,10 @@ enum HebcalService {
         .init(key: "candleLighting", hebrewTitle: "כניסת שבת", englishTitle: "Candle Lighting", icon: "flame.fill")
     ]
 
+    static func isPrimaryZman(_ key: String) -> Bool {
+        definitions.contains { $0.key == key } || key == "tzeitRT"
+    }
+
     struct Response: Decodable {
         let date: String
         let times: [String: String]
@@ -156,14 +160,8 @@ enum HebcalService {
             ))
         }
 
-        // Preserve additional authenticated zmanim supplied by Hebcal rather than silently dropping them.
-        let knownKeys = Set(definitions.map(\.key))
-        for (key, raw) in decoded.times where !knownKeys.contains(key) {
-            guard let moment = parser.date(from: raw) else { continue }
-            let title = key.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
-            items.append(ZmanItem(key: key, hebrewTitle: title, englishTitle: title, icon: "clock", date: moment))
-        }
-
+        // Additional methods are available through the calendar data layer, but must
+        // not enter the primary timeline without curated Hebrew names and user selection.
         let sorted = items.sorted { $0.date < $1.date }
         #if DEBUG
         logger.debug("Successfully parsed \(sorted.count) zmanim for date \(apiDate(date, timeZone: timeZone), privacy: .public)")

@@ -44,9 +44,9 @@ public final class AppModel: ObservableObject {
            let validZone = snapshot.validTimeZone {
             cityName = snapshot.cityName
             timeZone = validZone
-            allItems = snapshot.items
+            allItems = snapshot.items.filter { HebcalService.isPrimaryZman($0.key) }
             calendarEvents = snapshot.calendarEvents
-            todayItems = ZmanDayResolver.itemsForDay(from: snapshot.items, date: Date(), timeZone: validZone)
+            todayItems = ZmanDayResolver.itemsForDay(from: allItems, date: Date(), timeZone: validZone)
             currentLocation = CLLocation(latitude: snapshot.latitude, longitude: snapshot.longitude)
         } else {
             cityName = ""
@@ -207,9 +207,9 @@ public final class AppModel: ObservableObject {
                SnapshotValidator.isFresh(snapshot: cached, for: .gps, now: Date()) {
                 cityName = cached.cityName
                 timeZone = cached.timeZone
-                allItems = cached.items
+                allItems = cached.items.filter { HebcalService.isPrimaryZman($0.key) }
                 calendarEvents = cached.calendarEvents
-                todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: cached.timeZone)
+                todayItems = ZmanDayResolver.itemsForDay(from: allItems, date: Date(), timeZone: cached.timeZone)
                 let loc = CLLocation(latitude: cached.latitude, longitude: cached.longitude)
                 currentLocation = loc
                 startWeatherTask(location: loc.coordinate, cityName: cached.cityName, timeZone: cached.timeZone, force: false)
@@ -233,9 +233,9 @@ public final class AppModel: ObservableObject {
             let identity = LocationIdentity.savedCity(id: city.id)
             if let cached = LocationSnapshotStore.loadSnapshot(for: identity),
                SnapshotValidator.isFresh(snapshot: cached, for: identity, now: Date()) {
-                allItems = cached.items
+                allItems = cached.items.filter { HebcalService.isPrimaryZman($0.key) }
                 calendarEvents = cached.calendarEvents
-                todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: city.timeZone)
+                todayItems = ZmanDayResolver.itemsForDay(from: allItems, date: Date(), timeZone: city.timeZone)
             } else {
                 todayItems = []
                 allItems = []
@@ -361,9 +361,9 @@ public final class AppModel: ObservableObject {
             guard gen == loadGeneration else { return }
             cityName = city.name
             timeZone = city.timeZone
-            allItems = cached.items
+            allItems = cached.items.filter { HebcalService.isPrimaryZman($0.key) }
             calendarEvents = cached.calendarEvents
-            todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: city.timeZone)
+            todayItems = ZmanDayResolver.itemsForDay(from: allItems, date: Date(), timeZone: city.timeZone)
             currentLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
             refreshJewishCalendar(location: currentLocation!, zone: city.timeZone, generation: gen)
 
@@ -387,7 +387,7 @@ public final class AppModel: ObservableObject {
 
         let loc = CLLocation(latitude: city.latitude, longitude: city.longitude)
         do {
-            let items = try await HebcalService.fetchDays(location: loc, timeZone: city.timeZone, count: 8)
+            let items = try await HebcalService.fetchTodayAndTomorrow(location: loc, timeZone: city.timeZone)
             guard gen == loadGeneration else { return }
 
             cityName = city.name
@@ -413,6 +413,7 @@ public final class AppModel: ObservableObject {
             } else {
                 Self.logger.error("Saved-city snapshot persistence failed; widget cache not updated")
             }
+            expandZmanimInBackground(location: loc, zone: city.timeZone, generation: gen, identity: identity)
 
             // If this is default location, reschedule notifications
             if case .savedCity(let defaultId) = locationPreferences.defaultChoice, defaultId == city.id {
@@ -433,6 +434,26 @@ public final class AppModel: ObservableObject {
         }
     }
 
+    private func expandZmanimInBackground(location: CLLocation, zone: TimeZone, generation: Int, identity: LocationIdentity) {
+        Task { [weak self] in
+            guard let self else { return }
+            guard let expanded = try? await HebcalService.fetchDays(location: location, timeZone: zone, count: 8),
+                  generation == self.loadGeneration else { return }
+            self.allItems = expanded
+            self.todayItems = ZmanDayResolver.itemsForDay(from: expanded, date: Date(), timeZone: zone)
+            if var snapshot = LocationSnapshotStore.loadSnapshot(for: identity) {
+                snapshot.items = expanded
+                snapshot.updatedAt = Date()
+                if LocationSnapshotStore.saveSnapshot(snapshot, for: identity) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+            }
+            if self.activeChoice == self.locationPreferences.defaultChoice {
+                await NotificationScheduler.rescheduleIfAuthorized(settings: self.settings, items: expanded, timeZone: zone)
+            }
+        }
+    }
+
     private func refreshJewishCalendar(location: CLLocation, zone: TimeZone, generation: Int) {
         let israel = (29.0...34.0).contains(location.coordinate.latitude)
             && (34.0...36.0).contains(location.coordinate.longitude)
@@ -442,24 +463,14 @@ public final class AppModel: ObservableObject {
                 let events = try await JewishCalendarService.fetch(location: location, timeZone: zone, israel: israel)
                 guard generation == self.loadGeneration else { return }
                 self.calendarEvents = events
-                let timed = JewishCalendarService.timedItems(from: events)
-                let timedIDs = Set(timed.map(\.id))
-                self.allItems = (self.allItems.filter { !timedIDs.contains($0.id) } + timed)
-                    .sorted { $0.date < $1.date }
-                self.todayItems = ZmanDayResolver.itemsForDay(from: self.allItems, date: Date(), timeZone: zone)
+                // Keep the main zmanim timeline stable. Calendar events are presented
+                // separately and must not become arbitrary next-zman candidates.
                 let identity = self.activeChoice.identity
                 if var snapshot = LocationSnapshotStore.loadSnapshot(for: identity) {
                     snapshot.calendarEvents = events
-                    snapshot.items = self.allItems
                     if LocationSnapshotStore.saveSnapshot(snapshot, for: identity) {
                         WidgetCenter.shared.reloadAllTimelines()
                     }
-                }
-                let isDefault = self.activeChoice == self.locationPreferences.defaultChoice
-                if isDefault {
-                    await NotificationScheduler.rescheduleIfAuthorized(
-                        settings: self.settings, items: self.allItems, timeZone: zone
-                    )
                 }
             } catch {
                 Self.logger.warning("Jewish calendar fetch failed: \(error.localizedDescription, privacy: .public)")
@@ -582,7 +593,7 @@ public final class AppModel: ObservableObject {
         startWeatherTask(location: location.coordinate, cityName: city, timeZone: zone, force: force)
 
         do {
-            let items = try await HebcalService.fetchDays(location: location, timeZone: zone, count: 8)
+            let items = try await HebcalService.fetchTodayAndTomorrow(location: location, timeZone: zone)
             guard gen == loadGeneration else { return }
 
             cityName = city
@@ -608,6 +619,7 @@ public final class AppModel: ObservableObject {
             )
             LocationSnapshotStore.saveSnapshot(snapshot, for: identity)
             WidgetCenter.shared.reloadAllTimelines()
+            expandZmanimInBackground(location: location, zone: zone, generation: gen, identity: identity)
 
             // If the loaded location is the persistent default location, reschedule notifications
             let isDefaultLocation: Bool

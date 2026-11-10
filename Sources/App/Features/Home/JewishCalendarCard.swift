@@ -5,45 +5,73 @@ public struct JewishCalendarCard: View {
     let date: Date
     let timeZone: TimeZone
 
+    @State private var showUpcoming = false
+
     public var body: some View {
         let relevant = visibleEvents
         if !relevant.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("הלוח העברי", systemImage: "calendar")
-                    .font(.headline)
-                ForEach(relevant) { event in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Image(systemName: icon(for: event.category))
-                            .frame(width: 20)
-                        Text(event.displayTitle)
-                            .font(.subheadline)
-                        Spacer(minLength: 4)
-                        if let time = event.time {
-                            Text(formattedDate(time, pattern: "HH:mm"))
-                                .font(.subheadline.monospacedDigit())
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundStyle(Color.zmanIndigo)
+                    Text("הלוח העברי")
+                        .font(.title3.bold())
+                    Spacer()
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(relevant.prefix(2)) { event in
+                        HStack(spacing: 12) {
+                            Image(systemName: icon(for: event.category))
+                                .foregroundStyle(Color.zmanIndigo)
+                                .frame(width: 28)
+                            Text(event.displayTitle)
+                                .font(.body.weight(.medium))
+                            Spacer()
+                            if let time = event.time {
+                                Text(formattedDate(time, pattern: "HH:mm"))
+                                    .monospacedDigit()
+                            }
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    }
+                    if events.count > 2 {
+                        Button {
+                            showUpcoming = true
+                        } label: {
+                            HStack {
+                                Text("האירועים הקרובים")
+                                Spacer()
+                                Image(systemName: "chevron.left")
+                            }
+                            .foregroundStyle(Color.zmanIndigo)
+                            .padding(14)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                if events.count > relevant.count {
-                    DisclosureGroup("האירועים הקרובים") {
-                        ForEach(events.filter { $0.date >= date }.prefix(35)) { event in
-                            HStack(spacing: 8) {
-                                Text(event.displayTitle).lineLimit(2)
-                                Spacer()
-                                Text(formattedDate(event.date, pattern: "d MMM"))
-                                    .font(.caption.monospacedDigit())
-                            }
-                            .font(.subheadline)
-                            .padding(.vertical, 3)
+                .zmanCard()
+            }
+            .sheet(isPresented: $showUpcoming) {
+                NavigationStack {
+                    List(events.filter { $0.date >= Calendar.current.startOfDay(for: date) }) { event in
+                        HStack {
+                            Text(event.displayTitle)
+                            Spacer()
+                            Text(formattedDate(event.date, pattern: "d MMM"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .font(.subheadline)
+                    .navigationTitle("הלוח העברי")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("סגור") { showUpcoming = false }
+                        }
+                    }
                 }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-            .accessibilityElement(children: .contain)
         }
     }
 
