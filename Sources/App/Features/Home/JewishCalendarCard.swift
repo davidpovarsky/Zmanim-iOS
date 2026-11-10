@@ -19,7 +19,7 @@ public struct JewishCalendarCard: View {
                             .font(.subheadline)
                         Spacer(minLength: 4)
                         if let time = event.time {
-                            Text(time, format: .dateTime.hour().minute().timeZone(timeZone))
+                            Text(time.formatted(Date.FormatStyle(date: .omitted, time: .shortened).timeZone(timeZone)))
                                 .font(.subheadline.monospacedDigit())
                         }
                     }
@@ -30,7 +30,7 @@ public struct JewishCalendarCard: View {
                             HStack(spacing: 8) {
                                 Text(event.displayTitle).lineLimit(2)
                                 Spacer()
-                                Text(event.date, format: .dateTime.day().month().timeZone(timeZone))
+                                Text(event.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).timeZone(timeZone)))
                                     .font(.caption.monospacedDigit())
                             }
                             .font(.subheadline)
