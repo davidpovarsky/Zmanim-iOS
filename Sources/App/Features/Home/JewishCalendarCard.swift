@@ -19,7 +19,7 @@ public struct JewishCalendarCard: View {
                             .font(.subheadline)
                         Spacer(minLength: 4)
                         if let time = event.time {
-                            Text(time.formatted(Date.FormatStyle(date: .omitted, time: .shortened).timeZone(timeZone)))
+                            Text(formattedDate(time, pattern: "HH:mm"))
                                 .font(.subheadline.monospacedDigit())
                         }
                     }
@@ -30,7 +30,7 @@ public struct JewishCalendarCard: View {
                             HStack(spacing: 8) {
                                 Text(event.displayTitle).lineLimit(2)
                                 Spacer()
-                                Text(event.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).timeZone(timeZone)))
+                                Text(formattedDate(event.date, pattern: "d MMM"))
                                     .font(.caption.monospacedDigit())
                             }
                             .font(.subheadline)
@@ -45,6 +45,14 @@ public struct JewishCalendarCard: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
             .accessibilityElement(children: .contain)
         }
+    }
+
+    private func formattedDate(_ date: Date, pattern: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.autoupdatingCurrent
+        formatter.timeZone = timeZone
+        formatter.dateFormat = pattern
+        return formatter.string(from: date)
     }
 
     private var visibleEvents: [JewishCalendarEvent] {
