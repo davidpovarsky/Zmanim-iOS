@@ -253,6 +253,7 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
     public var longitude: Double
     public var updatedAt: Date
     public var items: [ZmanItem]
+    public var calendarEvents: [JewishCalendarEvent] = []
     public var locationSignature: String?
     public var sourceIdentity: LocationIdentity?
     public var schemaVersion: Int
@@ -266,6 +267,7 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
         longitude: Double,
         updatedAt: Date,
         items: [ZmanItem],
+        calendarEvents: [JewishCalendarEvent] = [],
         locationSignature: String? = nil,
         sourceIdentity: LocationIdentity? = nil,
         schemaVersion: Int = 1,
@@ -278,6 +280,7 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
         self.longitude = longitude
         self.updatedAt = updatedAt
         self.items = items
+        self.calendarEvents = calendarEvents
         self.locationSignature = locationSignature
         self.sourceIdentity = sourceIdentity
         self.schemaVersion = schemaVersion
@@ -293,6 +296,7 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
         self.longitude = try container.decode(Double.self, forKey: .longitude)
         self.updatedAt = try container.decode(Date.self, forKey: .updatedAt)
         self.items = try container.decode([ZmanItem].self, forKey: .items)
+        self.calendarEvents = try container.decodeIfPresent([JewishCalendarEvent].self, forKey: .calendarEvents) ?? []
         self.locationSignature = try container.decodeIfPresent(String.self, forKey: .locationSignature)
         self.sourceIdentity = try container.decodeIfPresent(LocationIdentity.self, forKey: .sourceIdentity)
         self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
@@ -307,6 +311,7 @@ public struct ZmanSnapshot: Codable, Hashable, Sendable {
         case longitude
         case updatedAt
         case items
+        case calendarEvents
         case locationSignature
         case sourceIdentity
         case schemaVersion

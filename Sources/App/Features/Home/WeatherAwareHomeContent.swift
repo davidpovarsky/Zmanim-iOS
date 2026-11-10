@@ -82,6 +82,8 @@ public struct WeatherAwareHomeContent: View {
                     now: timelineDate
                 )
 
+                JewishCalendarCard(events: model.calendarEvents, date: timelineDate, timeZone: model.timeZone)
+
                 ZmanimDayList(
                     items: model.todayItems,
                     now: timelineDate,

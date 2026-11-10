@@ -96,6 +96,15 @@ public struct ZmanWidgetView: View {
         }
     }
 
+    private var todayCalendarTitle: String? {
+        guard let snapshot = entry.snapshot else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = snapshot.timeZone
+        return snapshot.calendarEvents.first(where: {
+            calendar.isDate($0.date, inSameDayAs: entry.date)
+        })?.displayTitle
+    }
+
     private var small: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -115,6 +124,9 @@ public struct ZmanWidgetView: View {
                 Text(state).font(.caption).foregroundStyle(.secondary)
             } else {
                 Text(LocalizedStringKey("widget.no_data")).font(.headline)
+            }
+            if let title = todayCalendarTitle {
+                Text(title).font(.caption2).lineLimit(1)
             }
             Spacer()
             HStack(spacing: 4) {
@@ -146,6 +158,9 @@ public struct ZmanWidgetView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                }
+                if let title = todayCalendarTitle {
+                    Text(title).font(.caption2).lineLimit(1)
                 }
                 if entry.isPlaceholder {
                     placeholderMedium

@@ -13,6 +13,7 @@ public final class AppModel: ObservableObject {
     @Published public var timeZone = TimeZone.current
     @Published public var todayItems: [ZmanItem] = []
     @Published public var allItems: [ZmanItem] = []
+    @Published public var calendarEvents: [JewishCalendarEvent] = []
     @Published public var settings = AppGroupStore.loadSettings()
     @Published public var locationPreferences = LocationPreferencesStore.loadPreferences()
     @Published public var activeChoice: LocationChoice = .current
@@ -44,6 +45,7 @@ public final class AppModel: ObservableObject {
             cityName = snapshot.cityName
             timeZone = validZone
             allItems = snapshot.items
+            calendarEvents = snapshot.calendarEvents
             todayItems = ZmanDayResolver.itemsForDay(from: snapshot.items, date: Date(), timeZone: validZone)
             currentLocation = CLLocation(latitude: snapshot.latitude, longitude: snapshot.longitude)
         } else {
@@ -195,6 +197,7 @@ public final class AppModel: ObservableObject {
             isGPSActive = true
             weatherModel.resetForLocationChange()
             currentLocation = nil
+            calendarEvents = []
             cityName = ""
             todayItems = []
             allItems = []
@@ -205,6 +208,7 @@ public final class AppModel: ObservableObject {
                 cityName = cached.cityName
                 timeZone = cached.timeZone
                 allItems = cached.items
+                calendarEvents = cached.calendarEvents
                 todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: cached.timeZone)
                 let loc = CLLocation(latitude: cached.latitude, longitude: cached.longitude)
                 currentLocation = loc
@@ -218,6 +222,7 @@ public final class AppModel: ObservableObject {
             guard let city = locationPreferences.city(for: id) else { return }
             cityName = city.name
             timeZone = city.timeZone
+            calendarEvents = []
             weatherModel.resetForLocationChange()
             let coord = CLLocationCoordinate2D(latitude: city.latitude, longitude: city.longitude)
             currentLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
@@ -229,6 +234,7 @@ public final class AppModel: ObservableObject {
             if let cached = LocationSnapshotStore.loadSnapshot(for: identity),
                SnapshotValidator.isFresh(snapshot: cached, for: identity, now: Date()) {
                 allItems = cached.items
+                calendarEvents = cached.calendarEvents
                 todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: city.timeZone)
             } else {
                 todayItems = []
@@ -356,8 +362,10 @@ public final class AppModel: ObservableObject {
             cityName = city.name
             timeZone = city.timeZone
             allItems = cached.items
+            calendarEvents = cached.calendarEvents
             todayItems = ZmanDayResolver.itemsForDay(from: cached.items, date: Date(), timeZone: city.timeZone)
             currentLocation = CLLocation(latitude: city.latitude, longitude: city.longitude)
+            refreshJewishCalendar(location: currentLocation!, zone: city.timeZone, generation: gen)
 
             // Recompute solar context for sky if weather is already present
             let rise = ZmanDayResolver.sunrise(from: todayItems, date: Date(), timeZone: city.timeZone)
@@ -387,6 +395,7 @@ public final class AppModel: ObservableObject {
             allItems = items
             todayItems = ZmanDayResolver.itemsForDay(from: items, date: Date(), timeZone: city.timeZone)
             currentLocation = loc
+            refreshJewishCalendar(location: loc, zone: city.timeZone, generation: gen)
             errorMessage = nil
 
             let snapshot = ZmanSnapshot(
@@ -421,6 +430,40 @@ public final class AppModel: ObservableObject {
         } catch {
             guard gen == loadGeneration else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func refreshJewishCalendar(location: CLLocation, zone: TimeZone, generation: Int) {
+        let israel = (29.0...34.0).contains(location.coordinate.latitude)
+            && (34.0...36.0).contains(location.coordinate.longitude)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let events = try await JewishCalendarService.fetch(location: location, timeZone: zone, israel: israel)
+                guard generation == self.loadGeneration else { return }
+                self.calendarEvents = events
+                let timed = JewishCalendarService.timedItems(from: events)
+                let timedIDs = Set(timed.map(\.id))
+                self.allItems = (self.allItems.filter { !timedIDs.contains($0.id) } + timed)
+                    .sorted { $0.date < $1.date }
+                self.todayItems = ZmanDayResolver.itemsForDay(from: self.allItems, date: Date(), timeZone: zone)
+                let identity = self.activeChoice.identity
+                if var snapshot = LocationSnapshotStore.loadSnapshot(for: identity) {
+                    snapshot.calendarEvents = events
+                    snapshot.items = self.allItems
+                    if LocationSnapshotStore.saveSnapshot(snapshot, for: identity) {
+                        WidgetCenter.shared.reloadAllTimelines()
+                    }
+                }
+                let isDefault = self.activeChoice == self.locationPreferences.defaultChoice
+                if isDefault {
+                    await NotificationScheduler.rescheduleIfAuthorized(
+                        settings: self.settings, items: self.allItems, timeZone: zone
+                    )
+                }
+            } catch {
+                Self.logger.warning("Jewish calendar fetch failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
@@ -546,6 +589,7 @@ public final class AppModel: ObservableObject {
             timeZone = zone
             allItems = items
             currentLocation = location
+            refreshJewishCalendar(location: location, zone: zone, generation: gen)
             isGPSActive = isGPS
             errorMessage = nil
 

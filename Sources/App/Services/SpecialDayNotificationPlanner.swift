@@ -69,7 +69,10 @@ public enum SpecialDayNotificationPlanner {
             }
 
             // Use verified tzeit7083deg as standard Motzei Shabbat
-            let havdalahCandidates = saturdayItems.filter { $0.key == "tzeit7083deg" }
+            let verifiedHavdalah = saturdayItems.filter { $0.key == "havdalah" }
+            let havdalahCandidates = verifiedHavdalah.isEmpty
+                ? saturdayItems.filter { $0.key == "tzeit7083deg" }
+                : verifiedHavdalah
             for item in havdalahCandidates {
                 let formattedTime = timeFormatter.string(from: item.date)
                 let body = String(
@@ -106,6 +109,19 @@ public enum SpecialDayNotificationPlanner {
                     body: body,
                     fireDate: item.date,
                     icon: "flame.fill"
+                ))
+            }
+        }
+
+        if settings.holidayEnabled {
+            for item in items where (item.key == "fastStart" || item.key == "fastEnd") && item.date > now.addingTimeInterval(2) {
+                let title = item.key == "fastStart" ? "תחילת הצום" : "סיום הצום"
+                results.append(ScheduledSpecialNotification(
+                    id: "zmanim.special.fast.\(item.key).\(Int(item.date.timeIntervalSince1970))",
+                    title: title,
+                    body: timeFormatter.string(from: item.date),
+                    fireDate: item.date,
+                    icon: "clock"
                 ))
             }
         }
