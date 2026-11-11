@@ -3,6 +3,7 @@ import CoreLocation
 import Foundation
 import UserNotifications
 import WidgetKit
+import OneBusAwayWeatherCore
 
 /// Opportunistic iOS-managed refresh, not a guaranteed periodic scheduler.
 enum ZmanimBackgroundRefresh {
