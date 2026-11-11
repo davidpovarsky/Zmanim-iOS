@@ -48,7 +48,7 @@ enum NotificationScheduler {
         let now = Date()
         let defaultIdentity = LocationPreferencesStore.loadPreferences().defaultChoice.identity
         let defaultSnapshot = LocationSnapshotStore.loadSnapshot(for: defaultIdentity)
-        let locationInfo: [String: Any] = defaultSnapshot.map {
+        let locationInfo: [AnyHashable: Any] = defaultSnapshot.map {
             ["cityName": $0.cityName, "latitude": $0.latitude, "longitude": $0.longitude]
         } ?? [:]
 
