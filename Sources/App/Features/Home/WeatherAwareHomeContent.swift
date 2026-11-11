@@ -56,6 +56,7 @@ public struct WeatherAwareHomeContent: View {
                     display: weather.weatherDisplay,
                     isLoading: model.isLoading,
                     textColor: headerTextColor,
+                    calendarEvents: model.calendarEvents,
                     onSelectChoice: { choice in
                         Task { await model.selectActiveChoice(choice) }
                     },
@@ -82,13 +83,13 @@ public struct WeatherAwareHomeContent: View {
                     now: timelineDate
                 )
 
+                SpecialDayTimesCard(events: model.calendarEvents, date: timelineDate, timeZone: model.timeZone)
+
                 ZmanimDayList(
                     items: model.todayItems,
                     now: timelineDate,
                     timeZone: model.timeZone
                 )
-
-                JewishCalendarCard(events: model.calendarEvents, date: timelineDate, timeZone: model.timeZone)
 
                 homeAttributionFooter
             }

@@ -12,6 +12,7 @@ public struct HomeHeader: View {
     public let display: WeatherDisplay?
     public let isLoading: Bool
     public let textColor: Color
+    public let calendarEvents: [JewishCalendarEvent]
     public let onSelectChoice: (LocationChoice) -> Void
     public let onAddCityTap: () -> Void
     public let onWeatherTap: () -> Void
@@ -27,6 +28,7 @@ public struct HomeHeader: View {
         display: WeatherDisplay?,
         isLoading: Bool,
         textColor: Color,
+        calendarEvents: [JewishCalendarEvent] = [],
         onSelectChoice: @escaping (LocationChoice) -> Void = { _ in },
         onAddCityTap: @escaping () -> Void = {},
         onWeatherTap: @escaping () -> Void
@@ -41,6 +43,7 @@ public struct HomeHeader: View {
         self.display = display
         self.isLoading = isLoading
         self.textColor = textColor
+        self.calendarEvents = calendarEvents
         self.onSelectChoice = onSelectChoice
         self.onAddCityTap = onAddCityTap
         self.onWeatherTap = onWeatherTap
@@ -76,10 +79,18 @@ public struct HomeHeader: View {
             Text(weekdayString(from: date))
                 .font(.subheadline)
                 .foregroundStyle(textColor.opacity(0.85))
-            Text(hebrewDateString(from: date))
-                .font(.title3.bold())
-                .foregroundStyle(textColor)
-                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(hebrewDateString(from: date))
+                    .font(.title3.bold())
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                if !todayOccasions.isEmpty {
+                    Text(todayOccasions.joined(separator: " · "))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(textColor)
+                        .lineLimit(2)
+                }
+            }
         }
     }
 
@@ -112,6 +123,14 @@ public struct HomeHeader: View {
         }
     }
 
+    private var todayOccasions: [String] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let categories: Set<String> = ["roshchodesh", "holiday", "major", "minor", "fast", "cholhamoed", "special"]
+        return Array(Set(calendarEvents.filter {
+            categories.contains($0.category) && calendar.isDate($0.date, inSameDayAs: date)
+        }.map(\.displayTitle))).sorted()
+    }
     private func weekdayString(from date: Date) -> String {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = timeZone

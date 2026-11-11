@@ -47,7 +47,11 @@ public struct HomeView: View {
                 }
             }
             .onChange(of: scenePhase) { _, phase in
+                if phase == .background {
+                    ZmanimBackgroundRefresh.schedule()
+                }
                 if phase == .active {
+                    Task { await ZmanimBackgroundRefresh.removeExpiredDeliveredNotifications() }
                     model.checkDayRollover(now: Date())
                     Task {
                         await model.refreshWeather(force: false)

@@ -46,6 +46,11 @@ enum NotificationScheduler {
         center.removePendingNotificationRequests(withIdentifiers: toRemove)
 
         let now = Date()
+        let defaultIdentity = LocationPreferencesStore.loadPreferences().defaultChoice.identity
+        let defaultSnapshot = LocationSnapshotStore.loadSnapshot(for: defaultIdentity)
+        let locationInfo: [String: Any] = defaultSnapshot.map {
+            ["cityName": $0.cityName, "latitude": $0.latitude, "longitude": $0.longitude]
+        } ?? [:]
 
         var candidates: [(Date, NotificationRule, ZmanItem)] = []
         for rule in settings.rules where rule.isEnabled {
@@ -76,7 +81,7 @@ enum NotificationScheduler {
                 "zmanProgress": progress,
                 "sunriseTime": sunrise?.timeIntervalSince1970 ?? 0,
                 "sunsetTime": sunset?.timeIntervalSince1970 ?? 0
-            ]
+            ].merging(locationInfo) { current, _ in current }
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, fire.timeIntervalSinceNow), repeats: false)
             try? await center.add(UNNotificationRequest(
                 identifier: "zmanim.daily.\(index).\(Int(fire.timeIntervalSince1970))",
@@ -102,8 +107,10 @@ enum NotificationScheduler {
             content.userInfo = [
                 "zmanTitle": special.title,
                 "zmanTime": special.fireDate.timeIntervalSince1970,
-                "zmanIcon": special.icon
-            ]
+                "zmanIcon": special.icon,
+                "sunriseTime": ZmanDayResolver.sunrise(from: items, date: special.fireDate, timeZone: timeZone)?.timeIntervalSince1970 ?? 0,
+                "sunsetTime": ZmanDayResolver.sunset(from: items, date: special.fireDate, timeZone: timeZone)?.timeIntervalSince1970 ?? 0
+            ].merging(locationInfo) { current, _ in current }
             let trigger = UNTimeIntervalNotificationTrigger(
                 timeInterval: max(1, special.fireDate.timeIntervalSinceNow),
                 repeats: false

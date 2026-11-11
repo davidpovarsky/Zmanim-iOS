@@ -509,6 +509,15 @@ public final class AppModel: ObservableObject {
                 force: force
             )
             guard gen == self.weatherGeneration else { return }
+            if self.weatherModel.isAvailable, let condition = self.weatherModel.condition {
+                NotificationSkyState(
+                    condition: String(describing: condition.skyCondition),
+                    cloudCover: self.weatherModel.cloudCover,
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    updatedAt: Date()
+                ).save()
+            }
         }
     }
 

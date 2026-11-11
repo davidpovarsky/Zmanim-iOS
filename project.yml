@@ -42,6 +42,8 @@ targets:
         UILaunchScreen: {}
         NSLocationWhenInUseUsageDescription: "המיקום משמש לחישוב זמני היום המדויקים באזור שלך."
         NSSupportsLiveActivities: true
+        BGTaskSchedulerPermittedIdentifiers: [com.davidpovarsky.Zmanim.refresh]
+        UIBackgroundModes: [fetch]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -95,11 +97,14 @@ targets:
       - Sources/Shared/SnoozeRequest.swift
       - Sources/Shared/SolarArcGeometry.swift
       - Sources/Shared/SolarPhase.swift
+      - Sources/Shared/NotificationSkyState.swift
       - path: Resources
         buildPhase: resources
     resources:
       - Sources/NotificationContent/MainInterface.storyboard
     dependencies:
+      - package: SwiftUISky
+        product: SwiftUISky
       - sdk: UserNotifications.framework
       - sdk: UserNotificationsUI.framework
     settings:
@@ -107,6 +112,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.davidpovarsky.Zmanim.NotificationContent
         DEVELOPMENT_LANGUAGE: he
         APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: Supporting/ZmanimWidgets.entitlements
         OTHER_LDFLAGS: ["$(inherited)", "-framework", "UserNotificationsUI", "-framework", "UserNotifications"]
     info:
       path: Supporting/ZmanimNotificationContent-Info.plist

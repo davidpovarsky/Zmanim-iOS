@@ -1,4 +1,5 @@
 import SwiftUI
+import BackgroundTasks
 import WidgetKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -7,6 +8,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         NotificationCoordinator.shared.install()
+        ZmanimBackgroundRefresh.register()
+        ZmanimBackgroundRefresh.schedule()
+        Task { await ZmanimBackgroundRefresh.removeExpiredDeliveredNotifications() }
         return true
     }
 }
