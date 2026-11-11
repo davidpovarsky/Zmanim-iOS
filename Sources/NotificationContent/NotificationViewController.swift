@@ -1,18 +1,22 @@
 import SwiftUI
+import os
 import UIKit
 import UserNotifications
 import UserNotificationsUI
 
 public final class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    private static let logger = Logger(subsystem: "com.davidpovarsky.Zmanim", category: "NotificationContent")
     private var hosted: UIHostingController<NotificationSolarView>?
 
     public override func viewDidLoad() {
         super.viewDidLoad()
+        Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_VIEWDIDLOAD")
         preferredContentSize = CGSize(width: 390, height: 265)
         view.backgroundColor = UIColor(red: 0.972, green: 0.966, blue: 0.936, alpha: 1)
     }
 
     public func didReceive(_ notification: UNNotification) {
+        Self.logger.notice("ZMANIM_NOTIFICATION_EXTENSION_DIDRECEIVE")
         let content = notification.request.content
         let title = content.userInfo["zmanTitle"] as? String ?? content.title
         let icon = content.userInfo["zmanIcon"] as? String ?? "sun.max.fill"
