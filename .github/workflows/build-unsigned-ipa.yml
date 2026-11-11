@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   unsigned-ipa:
-    needs: simulator-validation
     runs-on: macos-26
     timeout-minutes: 35
     steps:
