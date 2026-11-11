@@ -130,6 +130,24 @@ xcodebuild test \
 UITEST_STATUS=${PIPESTATUS[0]}
 set -e
 
+# Collect runtime logs immediately to ensure complete observability
+echo "=== Collecting Runtime Logs ==="
+xcrun simctl spawn "$DEVICE_ID" log show --style compact --last 5m \
+    --predicate 'process CONTAINS[c] "SpringBoard" OR process CONTAINS[c] "usernotificationsd" OR process CONTAINS[c] "pluginkit" OR process CONTAINS[c] "Zmanim" OR subsystem CONTAINS[c] "com.davidpovarsky.Zmanim"' \
+    > diagnostics/notifications/notification-runtime.log || true
+
+echo "Saved diagnostics/notifications/notification-runtime.log (size: $(wc -c < diagnostics/notifications/notification-runtime.log) bytes)"
+
+CRASH_DIR="$HOME/Library/Logs/DiagnosticReports"
+if [ -d "$CRASH_DIR" ]; then
+    for f in "$CRASH_DIR"/*Zmanim*; do
+        if [ -f "$f" ]; then
+            echo "=== CRASH REPORT: $f ==="
+            cat "$f"
+        fi
+    done
+fi
+
 if [ "$UITEST_STATUS" -ne 0 ] || ! grep -q '\*\* TEST SUCCEEDED \*\*' build/uitest.log; then
     echo "ERROR: ZmanimUITests failed with status $UITEST_STATUS"
     exit 1

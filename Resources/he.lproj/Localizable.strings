@@ -1,3 +1,134 @@
+"app_name" = "זמנים";
 "today" = "היום";
 "notifications" = "התראות";
 "next_zman" = "הזמן הבא";
+"daily_zmanim" = "זמני היום";
+"tomorrow" = "מחר";
+"now" = "עכשיו";
+"sunrise" = "זריחה";
+"sunset" = "שקיעה";
+"zmanim_data_source" = "נתוני הזמנים באדיבות Hebcal.com";
+"no_zmanim_data" = "אין נתוני זמנים זמינים";
+
+"remaining.now" = "עכשיו";
+"remaining.minutes_format" = "בעוד %d דק׳";
+"remaining.hours_format" = "בעוד %d שעות";
+"remaining.hours_minutes_format" = "בעוד %1$d שעות ו-%2$d דק׳";
+
+"location.current" = "המיקום הנוכחי";
+"location.fixed" = "עיר קבועה";
+"location.locating" = "מאתר מיקום…";
+"location.updating" = "מעדכן מיקום…";
+"location.unavailable" = "המיקום אינו זמין";
+"location.permission_required" = "נדרשת הרשאת מיקום";
+"location.services_disabled" = "שירותי המיקום כבויים";
+"location.geocode_failed" = "לא הצלחנו לקבל את המיקום הנוכחי";
+"location.default" = "ברירת מחדל";
+"location.set_default" = "קבע כברירת מחדל";
+"location.add_city" = "הוסף עיר…";
+"location.saved_cities" = "ערים שמורות";
+"location.remove_city" = "הסר עיר";
+"location.city_removed_widget" = "העיר הוסרה — ערוך את הווידג'ט";
+"location.confirm_remove_city" = "האם להסיר את %@ מרשימת הערים השמורות?";
+"location.cancel" = "ביטול";
+"location.remove" = "הסר";
+"location.menu_a11y" = "מיקום נוכחי: %@. הקש לשינוי מיקום.";
+
+"settings.personal_alerts" = "✦  התראות אישיות  ✦";
+"settings.my_notifications" = "ההתראות שלי";
+"settings.notifications_desc" = "הפעל את ההתראות שתרצה, ובחר כמה דקות מראש לקבל כל אחת.";
+"settings.send_test_alert" = "שלח התראת בדיקה";
+"settings.my_city" = "העיר שלי";
+"settings.location_source" = "מקור מיקום";
+"settings.search_city" = "חפש עיר או יישוב";
+"settings.resolving_location" = "מאמת מיקום…";
+"settings.shabbat_holiday_alert" = "התראה על זמני שבת וחג";
+"settings.shabbat_holiday_desc" = "כניסה ויציאה לפי העיר שלך";
+"settings.shabbat" = "שבת";
+"settings.shabbat_desc" = "כניסת שבת, יציאת שבת ורבנו תם";
+"settings.holidays_fasts" = "חגים וצומות";
+"settings.holidays_fasts_desc" = "כניסה ויציאה של ימים טובים וצומות";
+"settings.enable_zman_reminder" = "הפעל תזכורת לכל זמן שתבחר.";
+"settings.custom_reminders" = "תזכורות מותאמות";
+"settings.custom_reminders_desc" = "תזכורת עם שם משלך, מעוגנת לזמן שתבחר.";
+"settings.reminder_name_placeholder" = "שם התזכורת (למשל: להניח תפילין)";
+"settings.base_zman" = "זמן בסיס";
+"settings.add_reminder" = "הוסף תזכורת";
+"settings.save_settings" = "שמירת הגדרות";
+"settings.exact_time" = "במדויק";
+"settings.minutes_before_format" = "%d דק׳ לפני";
+"settings.minutes_after_format" = "%d דק׳ אחרי";
+"settings.debug_diagnostics" = "דיאגנוסטיקה (DEBUG)";
+
+"notification.snooze_5_min" = "נודניק 5 דק׳";
+"notification.open_zmanim" = "פתח זמני היום";
+"notification.time_reminder" = "תזכורת זמן";
+"notification.time_arrived" = "הזמן הגיע";
+"notification.time_arrived_time" = "הזמן הגיע · %@";
+"notification.in_minutes_format" = "בעוד %d דקות";
+"notification.minutes_ago_format" = "לפני %d דקות";
+"notification.minutes_before_format" = "%1$d דקות לפני · %2$@";
+"notification.minutes_after_format" = "%1$d דקות אחרי · %2$@";
+"notification.test_title" = "שקיעה בעוד 15 דקות";
+"notification.test_body" = "שקיעה היום בשעה 18:21";
+
+"widget.display_name" = "זמני היום";
+"widget.description" = "הזמן הבא, מסלול השמש ודפדוף זמני היום.";
+"widget.no_data" = "אין נתונים";
+"widget.open_app_to_refresh" = "פתח את האפליקציה לרענון";
+"widget.location_required" = "יש לאשר מיקום בווידג'ט";
+"widget.permission_required" = "נדרשת הרשאת מיקום";
+"widget.updated_at_format" = "עודכן ב-%@";
+"widget.open_app_to_refresh_city_format" = "פתח את האפליקציה לרענון %@";
+"widget.location_option.app_default" = "ברירת המחדל של האפליקציה";
+"widget.location_option.current" = "המיקום הנוכחי (GPS)";
+"widget.location_option.saved_city" = "עיר שמורה";
+"widget.location_label" = "מיקום";
+"widget.page.next" = "העמוד הבא";
+"widget.page.previous" = "העמוד הקודם";
+"widget.day.tomorrow" = "מחר";
+"widget.configuration_title" = "הגדרת מיקום הווידג'ט";
+"widget.configuration_desc" = "בחר את מקור המיקום של הווידג'ט: ברירת מחדל, מיקום נוכחי או עיר שמורה.";
+"widget.location_param_title" = "מיקום";
+"widget.location_entity_name" = "מיקום";
+"widget.intent.next_page_title" = "העמוד הבא בווידג'ט";
+"widget.intent.next_page_desc" = "מדפדף לחמשת זמני היום הבאים בווידג'ט.";
+"widget.intent.prev_page_title" = "העמוד הקודם בווידג'ט";
+"widget.intent.prev_page_desc" = "חוזר לחמשת זמני היום הקודמים בווידג'ט.";
+"widget.intent.toggle_reminder_title" = "הפעל או כבה תזכורת מהירה";
+"widget.intent.open_zmanim_title" = "פתח את זמנים";
+"widget.a11y.previous_page" = "חזור לחמשת הזמנים הקודמים";
+"widget.a11y.next_page" = "עבור לחמשת הזמנים הבאים";
+
+"weather.source_attribution" = "נתוני מזג אוויר: MET Norway (CC BY 4.0)";
+"weather.header_a11y_format" = "תחזית מזג אוויר: %1$@, %2$@";
+"weather.header_a11y_hint" = "הקש לפתיחת כרטיס תחזית מפורט";
+
+"error.invalid_url" = "לא ניתן ליצור בקשה ל-Hebcal.";
+"error.invalid_response_format" = "Hebcal החזיר שגיאה %d.";
+"error.empty_data" = "לא התקבלו נתונים מ-Hebcal.";
+
+"widget.shared_store_unavailable" = "לא ניתן לגשת להגדרות — פתח את האפליקציה";
+"widget.city_not_found" = "העיר לא נמצאה — פתח את האפליקציה";
+"widget.invalid_configuration" = "הגדרת הווידג'ט אינה תקינה — ערוך את הווידג'ט";
+"widget.location_not_found" = "מיקום לא נמצא";
+
+"location.store_unavailable" = "מאגר ההגדרות המשותף אינו נגיש.";
+"location.save_failed" = "שמירת ההגדרות נכשלה.";
+
+"search.no_results" = "לא נמצאו תוצאות לחיפוש.";
+"search.invalid_coords" = "קואורדינטות המיקום אינן תקינות.";
+"search.timezone_not_found" = "לא ניתן לקבוע את אזור הזמן של המיקום.";
+"search.failed_format" = "בחירת המיקום נכשלה: %@";
+
+"notification.shabbat_candle_body" = "כניסת שבת בשעה %@";
+"notification.shabbat_exit_body" = "צאת שבת בשעה %@";
+"notification.shabbat_exit" = "מוצאי שבת";
+"notification.holiday_candle_body" = "כניסת החג בשעה %@";
+
+"weather.error.invalid_coordinates" = "קואורדינטות מיקום שגויות.";
+"weather.error.invalid_url" = "לא ניתן ליצור כתובת לבקשת מזג האוויר.";
+"weather.error.server_error_format" = "שירות מזג האוויר החזיר שגיאה %d.";
+"weather.error.empty_data" = "לא התקבלו נתוני תחזית משירות מזג האוויר.";
+"weather.error.decoding_failed_format" = "פענוח נתוני מזג האוויר נכשל: %@";
+

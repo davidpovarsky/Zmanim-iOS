@@ -12,6 +12,7 @@ public struct SkyBackdrop: View {
     private let isPaused: Bool
     private let motionTimeOverride: TimeInterval?
     private let customHeight: CGFloat?
+    private let calendar: Calendar?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -25,7 +26,8 @@ public struct SkyBackdrop: View {
         isVisible: Bool = true,
         isPaused: Bool = false,
         motionTimeOverride: TimeInterval? = nil,
-        customHeight: CGFloat? = nil
+        customHeight: CGFloat? = nil,
+        calendar: Calendar? = nil
     ) {
         self.date = date
         self.actualSunrise = actualSunrise
@@ -37,6 +39,7 @@ public struct SkyBackdrop: View {
         self.isPaused = isPaused
         self.motionTimeOverride = motionTimeOverride
         self.customHeight = customHeight
+        self.calendar = calendar
     }
 
     public var body: some View {
@@ -45,7 +48,7 @@ public struct SkyBackdrop: View {
             page.ignoresSafeArea()
             GeometryReader { proxy in
                 let targetHeight = customHeight ?? min(max(proxy.size.width * 0.95, 360), 450)
-                SkyView(
+                let sky = SkyView(
                     date: date,
                     actualSunrise: actualSunrise,
                     actualSunset: actualSunset,
@@ -55,6 +58,13 @@ public struct SkyBackdrop: View {
                     isPaused: isPaused,
                     motionTimeOverride: motionTimeOverride
                 )
+                Group {
+                    if let calendar {
+                        sky.environment(\.calendar, calendar)
+                    } else {
+                        sky
+                    }
+                }
                 .frame(height: targetHeight)
                 .overlay {
                     // Continuous multi-stop dissolve into the page cream color

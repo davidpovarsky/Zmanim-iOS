@@ -6,3 +6,4 @@ build/
 *.ipa
 .DS_Store
 Zmanim.xcodeproj/
+.build/

@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "Zmanim";
 "CFBundleName" = "Zmanim";
+"NSLocationWhenInUseUsageDescription" = "Location is used to calculate accurate zmanim for your area.";

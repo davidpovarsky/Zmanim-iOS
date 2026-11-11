@@ -1,4 +1,5 @@
 import SwiftUI
+import BackgroundTasks
 import WidgetKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -7,6 +8,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         NotificationCoordinator.shared.install()
+        ZmanimBackgroundRefresh.register()
+        ZmanimBackgroundRefresh.schedule()
+        Task { await ZmanimBackgroundRefresh.removeExpiredDeliveredNotifications() }
         return true
     }
 }
@@ -26,14 +30,10 @@ struct ZmanimApp: App {
             if let renderArg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("-RenderWidget:") }) {
                 let family = String(renderArg.dropFirst("-RenderWidget:".count))
                 WidgetHarnessView(family: family, model: model)
-                    .environment(\.layoutDirection, .rightToLeft)
-                    .preferredColorScheme(.light)
                     .task { model.start() }
             } else {
                 RootView()
                     .environmentObject(model)
-                    .environment(\.layoutDirection, .rightToLeft)
-                    .preferredColorScheme(.light)
                     .task {
                         if let previewArg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("-WeatherPreview:") }) {
                             let key = String(previewArg.dropFirst("-WeatherPreview:".count))
@@ -49,8 +49,6 @@ struct ZmanimApp: App {
             #else
             RootView()
                 .environmentObject(model)
-                .environment(\.layoutDirection, .rightToLeft)
-                .preferredColorScheme(.light)
                 .task { model.start() }
             #endif
         }
@@ -59,13 +57,25 @@ struct ZmanimApp: App {
 
 struct RootView: View {
     var body: some View {
-        TabView {
-            HomeView()
-                .tabItem { Label("היום", systemImage: "sun.max.fill") }
-            NotificationSettingsView()
-                .tabItem { Label("התראות", systemImage: "bell.badge.fill") }
+        if #available(iOS 18.0, *) {
+            TabView {
+                Tab(LocalizedStringKey("today"), systemImage: "sun.max.fill") {
+                    HomeView()
+                }
+                Tab(LocalizedStringKey("notifications"), systemImage: "bell.badge.fill") {
+                    NotificationSettingsView()
+                }
+            }
+            .tint(.zmanIndigo)
+        } else {
+            TabView {
+                HomeView()
+                    .tabItem { Label(LocalizedStringKey("today"), systemImage: "sun.max.fill") }
+                NotificationSettingsView()
+                    .tabItem { Label(LocalizedStringKey("notifications"), systemImage: "bell.badge.fill") }
+            }
+            .tint(.zmanIndigo)
         }
-        .tint(.zmanIndigo)
     }
 }
 
@@ -96,7 +106,7 @@ struct WidgetHarnessView: View {
             updatedAt: Date(),
             items: model.allItems
         )
-        let entry = ZmanEntry(date: Date(), snapshot: snapshot, state: nil)
+        let entry = ZmanEntry(date: Date(), snapshot: snapshot, state: nil, isGPS: model.isGPSActive)
 
         switch family.lowercased() {
         case "small":
